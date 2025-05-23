@@ -21,8 +21,12 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
 
 # 管理員 ID（可填多個）
-ADMINS = ["U8f3cc921a9dd18d3e257008a34dd07c1"]  # 換成妳自己的 user_id
-
+# 多位管理員（加你自己的 user_id）
+ADMINS = [
+    "U8f3cc921a9dd18d3e257008a34dd07c1",
+    "Uyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+    "Uzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
+]
 # 使用者模型
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
