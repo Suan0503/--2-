@@ -21,7 +21,7 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
 
 # 管理員 ID（可填多個）
-ADMINS = ["U1234567890abcdef1234567890abcdef"]  # 換成妳自己的 user_id
+ADMINS = ["U8f3cc921a9dd18d3e257008a34dd07c1"]  # 換成妳自己的 user_id
 
 # 使用者模型
 class User(db.Model):
