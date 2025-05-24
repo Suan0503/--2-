@@ -26,7 +26,7 @@ line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
 # 管理員列表（改成自己的 LINE ID）
-ADMINS = ["U你的LINEID"]
+ADMINS = ["U8f3cc921a9dd18d3e257008a34dd07c1"]
 
 # 資料表
 class User(db.Model):
