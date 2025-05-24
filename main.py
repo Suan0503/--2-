@@ -108,7 +108,7 @@ def handle_message(event):
     black = Blacklist.query.filter_by(phone=number).first()
 
     if white and black:
-        reply = f"⚠️ 此號碼同時存在於黑白名單中
+       reply = f"⚠️ 此號碼同時存在於黑白名單中
 請聯絡管理員確認處理！"
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
         return
