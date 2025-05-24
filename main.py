@@ -8,9 +8,6 @@ from dotenv import load_dotenv
 import os
 import re
 
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
-
 load_dotenv()
 
 app = Flask(__name__)
@@ -49,13 +46,6 @@ class Whitelist(db.Model):
 with app.app_context():
     db.create_all()
 
-def append_to_sheet(phone_number, line_user_id, status, verified_at):
-    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    creds = ServiceAccountCredentials.from_json_keyfile_name("creds.json", scope)
-    client = gspread.authorize(creds)
-    sheet = client.open_by_key("你的 Google Sheet ID").sheet1
-    sheet.append_row([phone_number, line_user_id, status, str(verified_at)])
-
 @app.route("/")
 def home():
     return "LINE Bot 正常運作中～🍓"
@@ -72,7 +62,7 @@ def callback():
 
 @handler.add(FollowEvent)
 def handle_follow(event):
-    welcome = "歡迎加入～請輸入手機號碼進行驗證喲 📱"
+    welcome = "🎉 歡迎加入！\n請輸入手機號碼 (09開頭) 進行驗證唷～📱"
     line_bot_api.reply_message(event.reply_token, TextSendMessage(text=welcome))
 
 @handler.add(MessageEvent, message=TextMessage)
@@ -80,16 +70,15 @@ def handle_message(event):
     user_id = event.source.user_id
     user_text = event.message.text.strip()
 
-    # 指令查詢
     if user_text == "/指令":
         reply = (
             "📋 可用指令列表：\n"
-            "/查 單號碼 - 查使用者驗證狀態\n"
-            "/封鎖 手機號 - 將使用者列入黑名單\n"
-            "/解鎖 手機號 - 解除封鎖\n"
-            "/拉黑 手機號 原因\n"
-            "/白單 手機號 原因\n"
-            "/查單 手機號 - 查詢黑白名單紀錄"
+            "• /查 單號碼 ➜ 查使用者狀態\n"
+            "• /封鎖 手機號 ➜ 加入黑名單\n"
+            "• /解鎖 手機號 ➜ 移除黑名單\n"
+            "• /拉黑 手機號 原因\n"
+            "• /白單 手機號 原因\n"
+            "• /查單 手機號 ➜ 查詢黑白單紀錄"
         )
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
         return
@@ -103,6 +92,7 @@ def handle_message(event):
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
         return
 
+    # ✨ 管理員專用指令
     if user_id in ADMINS:
         if user_text.startswith("/查 "):
             number = user_text[3:].strip()
@@ -185,30 +175,41 @@ def handle_message(event):
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
             return
 
-    # 手機號碼驗證區段
+    # ✅ 手機號碼驗證區段 + 綁定邏輯
     if re.match(r"^09\d{8}$", user_text):
-        existing = User.query.filter_by(phone_number=user_text).first()
-        if existing:
-            if existing.status == "black":
+        existing_by_id = User.query.filter_by(line_user_id=user_id).first()
+        existing_by_phone = User.query.filter_by(phone_number=user_text).first()
+
+        if existing_by_phone and existing_by_phone.line_user_id != user_id:
+            reply = f"⚠️ 此號碼已由其他帳號驗證過，無法重複綁定 ❌"
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
+            return
+
+        if existing_by_id:
+            if existing_by_id.status == "black":
                 return
-            elif existing.status == "white":
-                reply = f"你已驗證過囉～📱 {existing.phone_number}"
+            elif existing_by_id.status == "white":
+                vtime = existing_by_id.verified_at.strftime("%Y/%m/%d %H:%M") if existing_by_id.verified_at else "-"
+                reply = f"📱 {existing_by_id.phone_number}\n✅ 已經驗證完成！\n🕒 時間：{vtime}"
             else:
-                existing.status = "white"
-                existing.verified_at = datetime.now()
+                existing_by_id.phone_number = user_text
+                existing_by_id.status = "white"
+                existing_by_id.verified_at = datetime.now()
                 db.session.commit()
-                reply = f"驗證成功！{user_text} 已加入白名單 🎉"
+                vtime = existing_by_id.verified_at.strftime("%Y/%m/%d %H:%M")
+                reply = f"✅ 驗證成功！\n📱 {user_text}\n🕒 時間：{vtime}"
         else:
-            user = User(
+            new_user = User(
                 line_user_id=user_id,
                 phone_number=user_text,
                 status="white",
                 verified_at=datetime.now()
             )
-            db.session.add(user)
+            db.session.add(new_user)
             db.session.commit()
-            append_to_sheet(user_text, user_id, "white", user.verified_at)
-            reply = f"驗證成功！{user_text} 已加入白名單 🎉"
+            vtime = new_user.verified_at.strftime("%Y/%m/%d %H:%M")
+            reply = f"✅ 驗證成功！\n📱 {user_text}\n🕒 時間：{vtime}"
+
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
 
 if __name__ == "__main__":
