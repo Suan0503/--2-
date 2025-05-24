@@ -1,118 +1,60 @@
-from flask import Flask, request, abort, jsonify, render_template, redirect
+from flask import Flask, request, abort
 from flask_sqlalchemy import SQLAlchemy
 from linebot import LineBotApi, WebhookHandler
+from linebot.models import MessageEvent, TextMessage, TextSendMessage
 from linebot.models import MessageEvent, TextMessage, TextSendMessage, FollowEvent
 from linebot.exceptions import InvalidSignatureError
 from datetime import datetime
 from dotenv import load_dotenv
-import os
-import re
-
-load_dotenv()
-
-app = Flask(__name__, template_folder="templates")
-app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-db = SQLAlchemy(app)
-
-LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
-LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET")
-line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
-handler = WebhookHandler(LINE_CHANNEL_SECRET)
-
-ADMINS = ["U8f3cc921a9dd18d3e257008a34dd07c1"]
-
-class User(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    line_user_id = db.Column(db.String(255), unique=True, nullable=False)
-    phone_number = db.Column(db.String(20), nullable=False)
-    status = db.Column(db.String(10), nullable=False, default='pending')
-    verified_at = db.Column(db.DateTime, nullable=True)
-
-class Blacklist(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    created_at = db.Column(db.DateTime, default=datetime.now)
-    date = db.Column(db.String(20))
-    phone = db.Column(db.String(20))
-    reason = db.Column(db.Text)
-
-class Whitelist(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    created_at = db.Column(db.DateTime, default=datetime.now)
-    date = db.Column(db.String(20))
-    phone = db.Column(db.String(20))
-    reason = db.Column(db.Text)
-
-with app.app_context():
-    db.create_all()
-
-@app.route("/")
-def home():
-    return "LINE Bot 正常運作中～🍓"
-
-@app.route("/callback", methods=["POST"])
-def callback():
-    signature = request.headers["X-Line-Signature"]
-    body = request.get_data(as_text=True)
-    try:
-        handler.handle(body, signature)
-    except InvalidSignatureError:
+@@ -70,11 +70,30 @@ def callback():
         abort(400)
     return "OK"
 
-@app.route("/dashboard")
-def dashboard():
-    return render_template("dashboard.html")
+@handler.add(FollowEvent)
+def handle_follow(event):
+    welcome = "歡迎加入～請輸入手機號碼進行驗證喲 📱"
+    line_bot_api.reply_message(event.reply_token, TextSendMessage(text=welcome))
 
-@app.route("/api/query")
-def api_query():
-    phone = request.args.get("phone")
-    user = User.query.filter_by(phone_number=phone).first()
-    if user:
-        return jsonify({
-            "status": user.status,
-            "phone": user.phone_number,
-            "line_user_id": user.line_user_id,
-            "verified_at": user.verified_at.strftime("%Y/%m/%d %H:%M") if user.verified_at else "-"
-        })
+@handler.add(MessageEvent, message=TextMessage)
+def handle_message(event):
+    user_id = event.source.user_id
+    user_text = event.message.text.strip()
+
+    # 指令查詢
+    if user_text == "/指令":
+        reply = (
+            "📋 可用指令列表：\n"
+            "/查 單號碼 - 查使用者驗證狀態\n"
+            "/封鎖 手機號 - 將使用者列入黑名單\n"
+            "/解鎖 手機號 - 解除封鎖\n"
+            "/拉黑 手機號 原因\n"
+            "/白單 手機號 原因\n"
+            "/查單 手機號 - 查詢黑白名單紀錄"
+        )
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
+        return
+
+    if user_text == "查詢":
+        user = User.query.filter_by(line_user_id=user_id).first()
+        if user:
+@@ -166,10 +185,7 @@ def handle_message(event):
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
+            return
+
+    # 非指令處理區段 - 最後驗證手機
+    if user_text.startswith("/"):
+        return
+
+    # 手機號碼驗證區段
+    if re.match(r"^09\d{8}$", user_text):
+        existing = User.query.filter_by(phone_number=user_text).first()
+        if existing:
+@@ -194,8 +210,6 @@ def handle_message(event):
+            append_to_sheet(user_text, user_id, "white", user.verified_at)
+            reply = f"驗證成功！{user_text} 已加入白名單 🎉"
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
     else:
-        return jsonify({ "status": "not_found" })
-
-@app.route("/api/whitelist", methods=["POST"])
-def api_whitelist():
-    data = request.get_json()
-    phone = data.get("phone")
-    reason = data.get("reason")
-    new_entry = Whitelist(date=datetime.now().strftime("%Y-%m-%d"), phone=phone, reason=reason)
-    db.session.add(new_entry)
-    db.session.commit()
-    return jsonify({"message": f"{phone} 已加入白名單"})
-
-@app.route("/api/blacklist", methods=["POST"])
-def api_blacklist():
-    data = request.get_json()
-    phone = data.get("phone")
-    reason = data.get("reason")
-    new_entry = Blacklist(date=datetime.now().strftime("%Y-%m-%d"), phone=phone, reason=reason)
-    db.session.add(new_entry)
-    db.session.commit()
-    return jsonify({"message": f"{phone} 已加入黑名單"})
-
-@app.route("/api/update", methods=["POST"])
-def api_update():
-    data = request.get_json()
-    phone = data.get("phone")
-    new_status = data.get("status")
-    user = User.query.filter_by(phone_number=phone).first()
-    if user:
-        user.status = new_status
-        db.session.commit()
-        return jsonify({"message": f"{phone} 狀態已更新為 {new_status}"})
-    return jsonify({"message": "未找到使用者"})
-
-@app.route("/查詢")
-def shortcut():
-    return redirect("/dashboard")
+        return
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
