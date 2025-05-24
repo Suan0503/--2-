@@ -60,6 +60,48 @@ def callback():
         abort(400)
     return "OK"
 
+@handler.add(MessageEvent, message=TextMessage)
+def handle_message(event):
+    user_id = event.source.user_id
+    user_text = event.message.text.strip()
+    print(f"收到使用者輸入：{user_text}")
+
+    if re.match(r"^09\d{8}$", user_text):
+        existing_by_id = User.query.filter_by(line_user_id=user_id).first()
+        existing_by_phone = User.query.filter_by(phone_number=user_text).first()
+
+        if existing_by_phone and existing_by_phone.line_user_id != user_id:
+            reply = f"⚠️ 此號碼已由其他帳號驗證過，無法重複綁定 ❌"
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
+            return
+
+        if existing_by_id:
+            if existing_by_id.status == "black":
+                return
+            elif existing_by_id.status == "white":
+                vtime = existing_by_id.verified_at.strftime("%Y/%m/%d %H:%M") if existing_by_id.verified_at else "-"
+                reply = f"📱 {existing_by_id.phone_number}\n✅ 已經驗證完成！\n🕒 時間：{vtime}"
+            else:
+                existing_by_id.phone_number = user_text
+                existing_by_id.status = "white"
+                existing_by_id.verified_at = datetime.now()
+                db.session.commit()
+                vtime = existing_by_id.verified_at.strftime("%Y/%m/%d %H:%M")
+                reply = f"✅ 驗證成功！\n📱 {user_text}\n🕒 時間：{vtime}"
+        else:
+            new_user = User(
+                line_user_id=user_id,
+                phone_number=user_text,
+                status="white",
+                verified_at=datetime.now()
+            )
+            db.session.add(new_user)
+            db.session.commit()
+            vtime = new_user.verified_at.strftime("%Y/%m/%d %H:%M")
+            reply = f"✅ 驗證成功！\n📱 {user_text}\n🕒 時間：{vtime}"
+
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
+
 @app.route("/dashboard")
 def dashboard():
     users = User.query.order_by(User.verified_at.desc()).all()
