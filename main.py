@@ -11,49 +11,60 @@ import re
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
-# 載入 .env 環境變數
+# 讀取 .env 環境變數
 load_dotenv()
 
-# Flask app 初始化
 app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
 
-# LINE 機器人金鑰
+# LINE 設定
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
 LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET")
 line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
-# 管理員 LINE ID 列表（請替換）
-ADMINS = ["U你的LINEID"]  # <--- 請換成妳的 LINE 使用者 ID
+# 管理員列表（改成自己的 LINE ID）
+ADMINS = ["U你的LINEID"]
 
-# 資料表模型
+# 資料表
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     line_user_id = db.Column(db.String(255), unique=True, nullable=False)
     phone_number = db.Column(db.String(20), nullable=False)
-    status = db.Column(db.String(10), nullable=False, default='pending')  # white / black / pending
+    status = db.Column(db.String(10), nullable=False, default='pending')
     verified_at = db.Column(db.DateTime, nullable=True)
+
+class Blacklist(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    date = db.Column(db.String(20))
+    phone = db.Column(db.String(20))
+    reason = db.Column(db.Text)
+
+class Whitelist(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    date = db.Column(db.String(20))
+    phone = db.Column(db.String(20))
+    reason = db.Column(db.Text)
 
 with app.app_context():
     db.create_all()
 
-# Google Sheets 備份函式（需替換 Sheet ID）
+# Google Sheet 備份
 def append_to_sheet(phone_number, line_user_id, status, verified_at):
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     creds = ServiceAccountCredentials.from_json_keyfile_name("creds.json", scope)
     client = gspread.authorize(creds)
-    sheet = client.open_by_key("你的 Google Sheet ID").sheet1  # <--- 請替換
+    sheet = client.open_by_key("你的 Google Sheet ID").sheet1
     sheet.append_row([phone_number, line_user_id, status, str(verified_at)])
 
-# 主頁測試
 @app.route("/")
 def home():
-    return "LINE 機器人正在運行 🐣"
+    return "LINE Bot 正常運作中～🍓"
 
-# LINE 回呼
 @app.route("/callback", methods=["POST"])
 def callback():
     signature = request.headers["X-Line-Signature"]
@@ -64,23 +75,21 @@ def callback():
         abort(400)
     return "OK"
 
-# 處理訊息事件
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
     user_id = event.source.user_id
     user_text = event.message.text.strip()
 
-    # 使用者查詢自己
     if user_text == "查詢":
         user = User.query.filter_by(line_user_id=user_id).first()
         if user:
             reply = f"✅ 你已驗證：{user.phone_number}\n狀態：{user.status}"
         else:
-            reply = "你還沒有驗證手機唷～🥺"
+            reply = "你還沒驗證手機喔～🥺"
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
         return
 
-    # 管理員指令區
+    # 管理員指令
     if user_id in ADMINS:
         if user_text.startswith("/查 "):
             number = user_text[3:].strip()
@@ -120,20 +129,65 @@ def handle_message(event):
             if user:
                 db.session.delete(user)
                 db.session.commit()
-                reply = f"{number} 資料已刪除 🗑"
+                reply = f"{number} 已刪除資料 🗑"
             else:
                 reply = f"{number} 不存在"
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
             return
 
-    # 一般用戶驗證手機
+        elif user_text.startswith("/拉黑 "):
+            parts = user_text.split(" ", 2)
+            if len(parts) < 3:
+                reply = "格式錯誤！請使用：/拉黑 手機號 原因"
+            else:
+                phone, reason = parts[1], parts[2]
+                db.session.add(Blacklist(
+                    date=datetime.now().strftime("%Y-%m-%d"),
+                    phone=phone,
+                    reason=reason
+                ))
+                db.session.commit()
+                reply = f"{phone} 已加入黑名單\n理由：{reason}"
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
+            return
+
+        elif user_text.startswith("/白單 "):
+            parts = user_text.split(" ", 2)
+            if len(parts) < 3:
+                reply = "格式錯誤！請使用：/白單 手機號 原因"
+            else:
+                phone, reason = parts[1], parts[2]
+                db.session.add(Whitelist(
+                    date=datetime.now().strftime("%Y-%m-%d"),
+                    phone=phone,
+                    reason=reason
+                ))
+                db.session.commit()
+                reply = f"{phone} 已加入白名單\n理由：{reason}"
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
+            return
+
+        elif user_text.startswith("/查單 "):
+            phone = user_text.split(" ", 1)[1]
+            b = Blacklist.query.filter_by(phone=phone).first()
+            w = Whitelist.query.filter_by(phone=phone).first()
+            if b:
+                reply = f"🔴 黑名單\n日期：{b.date}\n理由：{b.reason}"
+            elif w:
+                reply = f"🟢 白名單\n日期：{w.date}\n理由：{w.reason}"
+            else:
+                reply = f"{phone} 不在任何名單中"
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
+            return
+
+    # 使用者驗證手機
     if re.match(r"^09\d{8}$", user_text):
         existing = User.query.filter_by(phone_number=user_text).first()
         if existing:
             if existing.status == "black":
-                return  # 黑名單不回應
+                return
             elif existing.status == "white":
-                reply = f"你已經驗證過囉～📱 {existing.phone_number}"
+                reply = f"你已驗證過囉～📱 {existing.phone_number}"
             else:
                 existing.status = "white"
                 existing.verified_at = datetime.now()
@@ -155,6 +209,5 @@ def handle_message(event):
 
     line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
 
-# 入口點
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
