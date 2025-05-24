@@ -1,4 +1,4 @@
-from flask import Flask, request, abort, jsonify, render_template
+from flask import Flask, request, abort, jsonify, render_template, redirect
 from flask_sqlalchemy import SQLAlchemy
 from linebot import LineBotApi, WebhookHandler
 from linebot.models import MessageEvent, TextMessage, TextSendMessage, FollowEvent
@@ -60,52 +60,9 @@ def callback():
         abort(400)
     return "OK"
 
-@handler.add(MessageEvent, message=TextMessage)
-def handle_message(event):
-    user_id = event.source.user_id
-    user_text = event.message.text.strip()
-    print(f"收到使用者輸入：{user_text}")
-
-    if re.match(r"^09\d{8}$", user_text):
-        existing_by_id = User.query.filter_by(line_user_id=user_id).first()
-        existing_by_phone = User.query.filter_by(phone_number=user_text).first()
-
-        if existing_by_phone and existing_by_phone.line_user_id != user_id:
-            reply = f"⚠️ 此號碼已由其他帳號驗證過，無法重複綁定 ❌"
-            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
-            return
-
-        if existing_by_id:
-            if existing_by_id.status == "black":
-                return
-            elif existing_by_id.status == "white":
-                vtime = existing_by_id.verified_at.strftime("%Y/%m/%d %H:%M") if existing_by_id.verified_at else "-"
-                reply = f"📱 {existing_by_id.phone_number}\n✅ 已經驗證完成！\n🕒 時間：{vtime}"
-            else:
-                existing_by_id.phone_number = user_text
-                existing_by_id.status = "white"
-                existing_by_id.verified_at = datetime.now()
-                db.session.commit()
-                vtime = existing_by_id.verified_at.strftime("%Y/%m/%d %H:%M")
-                reply = f"✅ 驗證成功！\n📱 {user_text}\n🕒 時間：{vtime}"
-        else:
-            new_user = User(
-                line_user_id=user_id,
-                phone_number=user_text,
-                status="white",
-                verified_at=datetime.now()
-            )
-            db.session.add(new_user)
-            db.session.commit()
-            vtime = new_user.verified_at.strftime("%Y/%m/%d %H:%M")
-            reply = f"✅ 驗證成功！\n📱 {user_text}\n🕒 時間：{vtime}"
-
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
-
 @app.route("/dashboard")
 def dashboard():
-    users = User.query.order_by(User.verified_at.desc()).all()
-    return render_template("dashboard.html", users=users)
+    return render_template("dashboard.html")
 
 @app.route("/api/query")
 def api_query():
@@ -121,15 +78,41 @@ def api_query():
     else:
         return jsonify({ "status": "not_found" })
 
-@app.route("/api/delete", methods=["POST"])
-def api_delete():
-    phone = request.form.get("phone")
+@app.route("/api/whitelist", methods=["POST"])
+def api_whitelist():
+    data = request.get_json()
+    phone = data.get("phone")
+    reason = data.get("reason")
+    new_entry = Whitelist(date=datetime.now().strftime("%Y-%m-%d"), phone=phone, reason=reason)
+    db.session.add(new_entry)
+    db.session.commit()
+    return jsonify({"message": f"{phone} 已加入白名單"})
+
+@app.route("/api/blacklist", methods=["POST"])
+def api_blacklist():
+    data = request.get_json()
+    phone = data.get("phone")
+    reason = data.get("reason")
+    new_entry = Blacklist(date=datetime.now().strftime("%Y-%m-%d"), phone=phone, reason=reason)
+    db.session.add(new_entry)
+    db.session.commit()
+    return jsonify({"message": f"{phone} 已加入黑名單"})
+
+@app.route("/api/update", methods=["POST"])
+def api_update():
+    data = request.get_json()
+    phone = data.get("phone")
+    new_status = data.get("status")
     user = User.query.filter_by(phone_number=phone).first()
     if user:
-        db.session.delete(user)
+        user.status = new_status
         db.session.commit()
-        return jsonify({"message": f"{phone} 已刪除"})
+        return jsonify({"message": f"{phone} 狀態已更新為 {new_status}"})
     return jsonify({"message": "未找到使用者"})
+
+@app.route("/查詢")
+def shortcut():
+    return redirect("/dashboard")
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
