@@ -11,7 +11,6 @@ import re
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
-# 讀取 .env 環境變數
 load_dotenv()
 
 app = Flask(__name__)
@@ -19,16 +18,13 @@ app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
 
-# LINE 設定
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
 LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET")
 line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
-# 管理員列表（改成自己的 LINE ID）
 ADMINS = ["U8f3cc921a9dd18d3e257008a34dd07c1"]
 
-# 資料表
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     line_user_id = db.Column(db.String(255), unique=True, nullable=False)
@@ -53,7 +49,6 @@ class Whitelist(db.Model):
 with app.app_context():
     db.create_all()
 
-# Google Sheet 備份
 def append_to_sheet(phone_number, line_user_id, status, verified_at):
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     creds = ServiceAccountCredentials.from_json_keyfile_name("creds.json", scope)
@@ -89,7 +84,6 @@ def handle_message(event):
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
         return
 
-    # 管理員指令
     if user_id in ADMINS:
         if user_text.startswith("/查 "):
             number = user_text[3:].strip()
@@ -141,11 +135,7 @@ def handle_message(event):
                 reply = "格式錯誤！請使用：/拉黑 手機號 原因"
             else:
                 phone, reason = parts[1], parts[2]
-                db.session.add(Blacklist(
-                    date=datetime.now().strftime("%Y-%m-%d"),
-                    phone=phone,
-                    reason=reason
-                ))
+                db.session.add(Blacklist(date=datetime.now().strftime("%Y-%m-%d"), phone=phone, reason=reason))
                 db.session.commit()
                 reply = f"{phone} 已加入黑名單\n理由：{reason}"
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
@@ -157,11 +147,7 @@ def handle_message(event):
                 reply = "格式錯誤！請使用：/白單 手機號 原因"
             else:
                 phone, reason = parts[1], parts[2]
-                db.session.add(Whitelist(
-                    date=datetime.now().strftime("%Y-%m-%d"),
-                    phone=phone,
-                    reason=reason
-                ))
+                db.session.add(Whitelist(date=datetime.now().strftime("%Y-%m-%d"), phone=phone, reason=reason))
                 db.session.commit()
                 reply = f"{phone} 已加入白名單\n理由：{reason}"
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
@@ -180,7 +166,10 @@ def handle_message(event):
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
             return
 
-    # 使用者驗證手機
+    # 非指令處理區段 - 最後驗證手機
+    if user_text.startswith("/"):
+        return
+
     if re.match(r"^09\d{8}$", user_text):
         existing = User.query.filter_by(phone_number=user_text).first()
         if existing:
@@ -204,10 +193,9 @@ def handle_message(event):
             db.session.commit()
             append_to_sheet(user_text, user_id, "white", user.verified_at)
             reply = f"驗證成功！{user_text} 已加入白名單 🎉"
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
     else:
-        reply = "請輸入正確格式手機號碼（例如：09XXXXXXXX）📱"
-
-    line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
+        return
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
