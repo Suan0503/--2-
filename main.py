@@ -92,7 +92,6 @@ def handle_message(event):
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
         return
 
-    # ✨ 管理員專用指令
     if user_id in ADMINS:
         if user_text.startswith("/查 "):
             number = user_text[3:].strip()
@@ -102,30 +101,29 @@ def handle_message(event):
             return
 
         elif user_text.startswith("/封鎖 "):
-    number = user_text[4:].strip()
-    user = User.query.filter_by(phone_number=number).first()
-    white = Whitelist.query.filter_by(phone=number).first()
-    black = Blacklist.query.filter_by(phone=number).first()
+            number = user_text[4:].strip()
+            user = User.query.filter_by(phone_number=number).first()
+            white = Whitelist.query.filter_by(phone=number).first()
+            black = Blacklist.query.filter_by(phone=number).first()
 
-    if white and black:
-       reply = f"⚠️ 此號碼同時存在於黑白名單中
-請聯絡管理員確認處理！"
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
-        return
+            if white and black:
+                reply = "⚠️ 此號碼同時存在於黑白名單中\n請聯絡管理員確認處理！"
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
+                return
 
-    if user:
-        db.session.delete(user)
-        db.session.commit()
-        db.session.add(Blacklist(date=datetime.now().strftime("%Y-%m-%d"), phone=number, reason="封鎖指令處理"))
-        db.session.commit()
-        reply = f"{number} 已從使用者列表移除，並加入黑名單 ❌"
-    else:
-        db.session.add(Blacklist(date=datetime.now().strftime("%Y-%m-%d"), phone=number, reason="封鎖指令處理"))
-        db.session.commit()
-        reply = f"{number} 不在使用者列表，但已加入黑名單 ❌"
+            if user:
+                db.session.delete(user)
+                db.session.commit()
+                db.session.add(Blacklist(date=datetime.now().strftime("%Y-%m-%d"), phone=number, reason="封鎖指令處理"))
+                db.session.commit()
+                reply = f"{number} 已從使用者列表移除，並加入黑名單 ❌"
+            else:
+                db.session.add(Blacklist(date=datetime.now().strftime("%Y-%m-%d"), phone=number, reason="封鎖指令處理"))
+                db.session.commit()
+                reply = f"{number} 不在使用者列表，但已加入黑名單 ❌"
 
-    line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
-    return
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
+            return
 
         elif user_text.startswith("/解鎖 "):
             number = user_text[4:].strip()
@@ -189,7 +187,6 @@ def handle_message(event):
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
             return
 
-    # ✅ 手機號碼驗證區段 + 綁定邏輯
     if re.match(r"^09\d{8}$", user_text):
         existing_by_id = User.query.filter_by(line_user_id=user_id).first()
         existing_by_phone = User.query.filter_by(phone_number=user_text).first()
