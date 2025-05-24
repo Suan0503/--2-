@@ -62,7 +62,8 @@ def callback():
 
 @app.route("/dashboard")
 def dashboard():
-    return render_template("dashboard.html")
+    users = User.query.order_by(User.verified_at.desc()).all()
+    return render_template("dashboard.html", users=users)
 
 @app.route("/api/query")
 def api_query():
@@ -78,7 +79,15 @@ def api_query():
     else:
         return jsonify({ "status": "not_found" })
 
-# 🧠 其餘 LINE event 處理區塊請留原本（略）...
+@app.route("/api/delete", methods=["POST"])
+def api_delete():
+    phone = request.form.get("phone")
+    user = User.query.filter_by(phone_number=phone).first()
+    if user:
+        db.session.delete(user)
+        db.session.commit()
+        return jsonify({"message": f"{phone} 已刪除"})
+    return jsonify({"message": "未找到使用者"})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
