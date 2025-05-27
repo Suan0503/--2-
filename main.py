@@ -29,7 +29,7 @@ class Blacklist(db.Model):
     date = db.Column(db.String(20))
     phone = db.Column(db.String(20), unique=True)
     reason = db.Column(db.Text)
-    name = db.Column(db.String(255))
+    名稱 = db.Column(db.String(255))  # 中文欄位要一致
 
 class Whitelist(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -37,7 +37,7 @@ class Whitelist(db.Model):
     date = db.Column(db.String(20))
     phone = db.Column(db.String(20), unique=True)
     reason = db.Column(db.Text)
-    name = db.Column(db.String(255))
+    名稱 = db.Column(db.String(255))
 
 with app.app_context():
     db.create_all()
@@ -72,7 +72,7 @@ def handle_message(event):
     user_id = event.source.user_id
     user_text = event.message.text.strip()
 
-    # 進入或退出管理員模式
+    # 管理員模式開關
     if user_id in ADMINS:
         if user_text == "/管理員 ON":
             admin_mode.add(user_id)
@@ -83,7 +83,7 @@ def handle_message(event):
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❎ 已關閉管理員模式"))
             return
 
-    # 管理員模式指令集
+    # 管理員指令操作區
     if user_id in admin_mode:
         if user_text == "/指令":
             help_msg = (
@@ -102,9 +102,9 @@ def handle_message(event):
                 profile = line_bot_api.get_profile(user_id)
                 name = profile.display_name
                 if kind == "白名單":
-                    db.session.add(Whitelist(date=datetime.now().strftime("%Y-%m-%d"), phone=phone, reason="管理員新增", name=name))
+                    db.session.add(Whitelist(date=datetime.now().strftime("%Y-%m-%d"), phone=phone, reason="管理員新增", 名稱=name))
                 elif kind == "黑名單":
-                    db.session.add(Blacklist(date=datetime.now().strftime("%Y-%m-%d"), phone=phone, reason="管理員新增", name=name))
+                    db.session.add(Blacklist(date=datetime.now().strftime("%Y-%m-%d"), phone=phone, reason="管理員新增", 名稱=name))
                 db.session.commit()
                 line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"✅ {phone} 已新增至 {kind}"))
             except:
@@ -117,7 +117,7 @@ def handle_message(event):
                 w = Whitelist.query.filter_by(phone=phone).first()
                 if w:
                     db.session.delete(w)
-                    db.session.add(Blacklist(date=datetime.now().strftime("%Y-%m-%d"), phone=phone, reason="轉移白名單"))
+                    db.session.add(Blacklist(date=datetime.now().strftime("%Y-%m-%d"), phone=phone, reason="轉移白名單", 名稱=w.名稱))
                     db.session.commit()
                     line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"🔁 {phone} 已轉為黑名單"))
                 else:
@@ -126,20 +126,20 @@ def handle_message(event):
                 line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❗ 指令錯誤，格式為 /黑名單 手機號"))
             return
 
-        # 查詢白黑名單
+        # 查詢資料
         if re.match(r"^09\d{8}$", user_text):
             b = Blacklist.query.filter_by(phone=user_text).first()
             w = Whitelist.query.filter_by(phone=user_text).first()
             if b:
-                reply = f"🔴 黑名單\n🕒 {b.date}\n📱 {b.phone}\n🧸 {b.name or '無'}\n📵 {b.reason}"
+                reply = f"🔴 黑名單\n🕒 {b.date}\n📱 {b.phone}\n🧸 {b.名稱 or '無'}\n📵 {b.reason}"
             elif w:
-                reply = f"🟢 白名單\n🕒 {w.date}\n📱 {w.phone}\n🧸 {w.name or '無'}\n📖 {w.reason}"
+                reply = f"🟢 白名單\n🕒 {w.date}\n📱 {w.phone}\n🧸 {w.名稱 or '無'}\n📖 {w.reason}"
             else:
                 reply = f"❓ 查無此號碼：{user_text}"
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
             return
 
-    # 一般使用者驗證流程
+    # 一般使用者流程
     if re.match(r"^09\d{8}$", user_text):
         phone = user_text
         try:
@@ -150,17 +150,17 @@ def handle_message(event):
 
         black = Blacklist.query.filter_by(phone=phone).first()
         if black:
-            return  # 黑名單不回應
+            return  # 不回應黑名單
 
         white = Whitelist.query.filter_by(phone=phone).first()
         if white:
-            reply = f"📱 {phone}\n✅ 已經驗證完成！\n🧸 暱稱：{white.name or display_name}\n🕒 時間：{white.created_at.strftime('%Y/%m/%d %H:%M:%S')}"
+            reply = f"📱 {phone}\n✅ 已經驗證完成！\n🧸 暱稱：{white.名稱 or display_name}\n🕒 時間：{white.created_at.strftime('%Y/%m/%d %H:%M:%S')}"
         else:
             new_white = Whitelist(
                 date=datetime.now().strftime("%Y-%m-%d"),
                 phone=phone,
                 reason="自動加入",
-                name=display_name
+                名稱=display_name
             )
             db.session.add(new_white)
             db.session.commit()
