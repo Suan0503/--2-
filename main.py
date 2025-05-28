@@ -19,14 +19,6 @@ db = SQLAlchemy(app)
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
 LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET")
 
-# Debug: 檢查環境變數
-print("LINE_CHANNEL_ACCESS_TOKEN:", LINE_CHANNEL_ACCESS_TOKEN)
-print("LINE_CHANNEL_SECRET:", LINE_CHANNEL_SECRET)
-print("DATABASE_URL:", os.getenv("DATABASE_URL"))
-
-if not LINE_CHANNEL_ACCESS_TOKEN or not LINE_CHANNEL_SECRET or not os.getenv("DATABASE_URL"):
-    print("❗ 有一個或多個環境變數未設定，請確認 .env 或平台設定。")
-
 line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
@@ -35,7 +27,7 @@ admin_mode = set()
 
 class Blacklist(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    created_at = db.Column(db.DateTime, default=datetime.now)
+    created_at = db.Column(db.DateTime, default=datetime.now, nullable=False)
     date = db.Column(db.String(20))
     phone = db.Column(db.String(20), unique=True)
     reason = db.Column(db.Text)
@@ -43,7 +35,7 @@ class Blacklist(db.Model):
 
 class Whitelist(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    created_at = db.Column(db.DateTime, default=datetime.now)
+    created_at = db.Column(db.DateTime, default=datetime.now, nullable=False)
     date = db.Column(db.String(20))
     phone = db.Column(db.String(20), unique=True)
     reason = db.Column(db.Text)
@@ -59,15 +51,10 @@ def home():
 @app.route("/callback", methods=["POST"])
 def callback():
     signature = request.headers.get("X-Line-Signature")
-    if not signature:
-        print("❗ 缺少 X-Line-Signature header")
-        abort(400)
     body = request.get_data(as_text=True)
-    print("🔔 收到 LINE callback，body：", body)
     try:
         handler.handle(body, signature)
     except InvalidSignatureError:
-        print("❗ 無效的簽名（InvalidSignatureError）")
         abort(400)
     except Exception as e:
         print("❗ callback 發生例外：", e)
@@ -84,11 +71,7 @@ def handle_follow(event):
         "⭐️ LINE ID（打在下方）\n\n"
         "需符合圖片上的LINE ID 以及手機號碼 未顯示無法驗證"
     )
-    try:
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=msg))
-    except Exception as e:
-        print("❗ handle_follow 發生例外：", e)
-        traceback.print_exc()
+    line_bot_api.reply_message(event.reply_token, TextSendMessage(text=msg))
 
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
@@ -121,13 +104,8 @@ def handle_message(event):
             if user_text.startswith("/新增"):
                 try:
                     _, phone, kind = user_text.split()
-                    try:
-                        profile = line_bot_api.get_profile(user_id)
-                        name = profile.display_name
-                    except Exception as e:
-                        print("get_profile error:", e)
-                        traceback.print_exc()
-                        name = "未知管理員"
+                    profile = line_bot_api.get_profile(user_id)
+                    name = profile.display_name
                     if kind == "白名單":
                         db.session.add(Whitelist(date=datetime.now().strftime("%Y-%m-%d"), phone=phone, reason="管理員新增", name=name))
                     elif kind == "黑名單":
@@ -138,7 +116,6 @@ def handle_message(event):
                     db.session.commit()
                     line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"✅ {phone} 已新增至 {kind}"))
                 except Exception as e:
-                    print("❗ /新增 指令異常：", e)
                     traceback.print_exc()
                     line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❗ 格式錯誤：/新增 電話 白名單/黑名單"))
                 return
@@ -155,7 +132,6 @@ def handle_message(event):
                     else:
                         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"查無此白名單：{phone}"))
                 except Exception as e:
-                    print("❗ /黑名單 指令異常：", e)
                     traceback.print_exc()
                     line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❗ 指令錯誤，格式為 /黑名單 手機號"))
                 return
@@ -172,50 +148,41 @@ def handle_message(event):
                         reply = f"❓ 查無此號碼：{user_text}"
                     line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
                 except Exception as e:
-                    print("❗ 查詢電話異常：", e)
                     traceback.print_exc()
                     line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❗ 查詢異常"))
                 return
 
-        # 一般用戶自動驗證
         if re.match(r"^09\d{8}$", user_text):
             phone = user_text
             try:
-                try:
-                    profile = line_bot_api.get_profile(user_id)
-                    display_name = profile.display_name
-                except Exception as e:
-                    print("get_profile error:", e)
-                    traceback.print_exc()
-                    display_name = "未命名"
+                profile = line_bot_api.get_profile(user_id)
+                display_name = profile.display_name
+            except:
+                display_name = "未命名"
 
-                black = Blacklist.query.filter_by(phone=phone).first()
-                if black:
-                    print(f"用戶 {user_id} ({display_name}) 嘗試驗證但已在黑名單，不回應")
-                    return  # 黑名單不回應
+            black = Blacklist.query.filter_by(phone=phone).first()
+            if black:
+                return  # 黑名單直接忽略
 
-                white = Whitelist.query.filter_by(phone=phone).first()
-                if white:
-                    reply = f"📱 {phone}\n✅ 已經驗證完成！\n🧸 暱稱：{white.name or display_name}\n🕒 時間：{white.created_at.strftime('%Y/%m/%d %H:%M:%S')}"
-                else:
-                    new_white = Whitelist(
-                        date=datetime.now().strftime("%Y-%m-%d"),
-                        phone=phone,
-                        reason="自動加入",
-                        name=display_name
-                    )
-                    db.session.add(new_white)
-                    db.session.commit()
-                    reply = f"✅ 驗證成功！\n📱 {phone}\n🧸 暱稱：{display_name}\n🕒 {new_white.created_at.strftime('%Y/%m/%d %H:%M:%S')}"
+            white = Whitelist.query.filter_by(phone=phone).first()
+            if white:
+                created_time = white.created_at.strftime('%Y/%m/%d %H:%M:%S') if white.created_at else "未知時間"
+                reply = f"📱 {phone}\n✅ 已經驗證完成！\n🧸 暱稱：{white.name or display_name}\n🕒 時間：{created_time}"
+            else:
+                new_white = Whitelist(
+                    date=datetime.now().strftime("%Y-%m-%d"),
+                    phone=phone,
+                    reason="自動加入",
+                    name=display_name
+                )
+                db.session.add(new_white)
+                db.session.commit()
+                reply = f"✅ 驗證成功！\n📱 {phone}\n🧸 暱稱：{display_name}\n🕒 {new_white.created_at.strftime('%Y/%m/%d %H:%M:%S')}"
 
-                line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
-            except Exception as e:
-                print("❗ 手機號驗證異常：", e)
-                traceback.print_exc()
-                line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❗ 驗證時發生錯誤，請稍後再試"))
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
     except Exception as e:
-        print("❗ handle_message 全域異常：", e)
         traceback.print_exc()
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❗ 發生錯誤，請稍後再試"))
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
