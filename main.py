@@ -75,6 +75,7 @@ def handle_follow(event):
 def handle_message(event):
     user_id = event.source.user_id
     user_text = event.message.text.strip()
+    print(f"[INPUT] User ID: {user_id}, Text: {user_text}")  # 🔍 除錯用
 
     tz = pytz.timezone("Asia/Taipei")
     profile = line_bot_api.get_profile(user_id)
@@ -84,31 +85,31 @@ def handle_message(event):
     if existing:
         if user_text == existing.phone:
             reply = (
-                f"\ud83d\udcf1 {existing.phone}\n"
-                f"\ud83c\udf38 暱稱：{existing.name or display_name}\n"
+                f"📱 {existing.phone}\n"
+                f"🌸 暱稱：{existing.name or display_name}\n"
                 f"       個人編號：{existing.id}\n"
-                f"\ud83d\udd17 LINE ID：{existing.line_id or '未登記'}\n"
-                f"\ud83d\udd52 {existing.created_at.astimezone(tz).strftime('%Y/%m/%d %H:%M:%S')}\n"
-                f"\u2705 驗證成功，歡迎加入茗殿"
+                f"🔗 LINE ID：{existing.line_id or '未登記'}\n"
+                f"🕒 {existing.created_at.astimezone(tz).strftime('%Y/%m/%d %H:%M:%S')}\n"
+                f"✅ 驗證成功，歡迎加入茗殿"
             )
         else:
-            reply = "\u26a0\ufe0f 你已驗證完成，請輸入手機號碼查看驗證資訊"
+            reply = "⚠️ 你已驗證完成，請輸入手機號碼查看驗證資訊"
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
         return
 
-    if re.match(r"^09\\d{8}$", user_text):
+    if re.match(r"^09\d{8}$", user_text):  # ✅ 正確 regex
         black = Blacklist.query.filter_by(phone=user_text).first()
         if black:
             return
 
         repeated = Whitelist.query.filter_by(phone=user_text).first()
         if repeated and repeated.line_user_id:
-            reply = "\u26a0\ufe0f 此手機號碼已被使用，請輸入正確的手機號碼"
+            reply = "⚠️ 此手機號碼已被使用，請輸入正確的手機號碼"
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
             return
 
         temp_users[user_id] = {"phone": user_text, "name": display_name}
-        reply = "\ud83d\udcf1 手機已登記，請接著輸入您的 LINE ID～"
+        reply = "📱 手機已登記，請接著輸入您的 LINE ID～"
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
         return
 
@@ -118,10 +119,10 @@ def handle_message(event):
         temp_users[user_id] = record
 
         reply = (
-            f"\ud83d\udcf1 {record['phone']}\n"
-            f"\ud83c\udf38 暱稱：{record['name']}\n"
+            f"📱 {record['phone']}\n"
+            f"🌸 暱稱：{record['name']}\n"
             f"       個人編號：待驗證後產生\n"
-            f"\ud83d\udd17 LINE ID：{record['line_id']}\n"
+            f"🔗 LINE ID：{record['line_id']}\n"
             f"請問以上資料是否正確？正確請回復 1"
         )
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
@@ -154,12 +155,12 @@ def handle_message(event):
             created_time = now.strftime('%Y/%m/%d %H:%M:%S')
 
         reply = (
-            f"\ud83d\udcf1 {data['phone']}\n"
-            f"\ud83c\udf38 暱稱：{data['name']}\n"
+            f"📱 {data['phone']}\n"
+            f"🌸 暱稱：{data['name']}\n"
             f"       個人編號：{saved_id}\n"
-            f"\ud83d\udd17 LINE ID：{data['line_id']}\n"
-            f"\ud83d\udd52 {created_time}\n"
-            f"\u2705 驗證成功，歡迎加入茗殿"
+            f"🔗 LINE ID：{data['line_id']}\n"
+            f"🕒 {created_time}\n"
+            f"✅ 驗證成功，歡迎加入茗殿"
         )
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
         temp_users.pop(user_id)
