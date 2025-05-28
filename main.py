@@ -42,6 +42,8 @@ class Whitelist(db.Model):
 with app.app_context():
     db.create_all()
 
+pending_verification = {}  # user_id: (phone, line_id, name)
+
 @app.route("/")
 def home():
     return "LINE Bot 正常運作中～🍵"
@@ -64,10 +66,8 @@ def callback():
 def handle_follow(event):
     msg = (
         "歡迎加入🍵茗殿🍵\n\n"
-        "請正確回答並提供下面的資料快速配合驗證。\n\n"
-        "⭐️ 手機號碼（打在上方）\n"
-        "⭐️ LINE ID（打在下方）\n\n"
-        "需符合圖片上的LINE ID 以及手機號碼 未顯示無法驗證"
+        "請正確按照步驟提供資料配合快速驗證\n\n"
+        "➡️ **請輸入手機號碼進行驗證（含09開頭）**"
     )
     line_bot_api.reply_message(event.reply_token, TextSendMessage(text=msg))
 
@@ -76,60 +76,55 @@ def handle_message(event):
     try:
         user_id = event.source.user_id
         user_text = event.message.text.strip()
+        profile = line_bot_api.get_profile(user_id)
+        display_name = profile.display_name
 
-        try:
-            profile = line_bot_api.get_profile(user_id)
-            display_name = profile.display_name
-        except:
-            display_name = "未命名"
-
-        # 黑名單檢查
-        black = Blacklist.query.filter_by(phone=user_text).first()
-        if black:
-            return  # 黑名單直接忽略
-
-        # 輸入手機號碼
+        # 黑名單直接忽略
         if re.match(r"^09\d{8}$", user_text):
             phone = user_text
-            w = Whitelist.query.filter_by(phone=phone).first()
-            if w:
-                created_time = w.created_at.strftime('%Y/%m/%d %H:%M:%S') if w.created_at else "未知時間"
-                reply = (
-                    f"📱 {w.phone}\n"
-                    f"🧸 暱稱：{w.name or display_name}\n"
-                    f"🔗 LINE ID：{w.line_id or '尚未填寫'}\n"
-                    f"🕒 時間：{created_time}\n"
-                    f"✅ 驗證成功，歡迎加入茗殿"
-                )
-            else:
-                new_white = Whitelist(
-                    phone=phone,
-                    date=datetime.now().strftime("%Y-%m-%d"),
-                    reason="首次驗證",
-                    name=display_name
-                )
-                db.session.add(new_white)
-                db.session.commit()
-                reply = "📱 手機已登記！請接著輸入您的 LINE ID～"
+            if Blacklist.query.filter_by(phone=phone).first():
+                return
+
+            if Whitelist.query.filter_by(phone=phone).first():
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(text="此手機號碼已被使用 請輸入正確的手機號碼"))
+                return
+
+            pending_verification[user_id] = {"phone": phone, "line_id": None, "name": display_name}
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="📱 手機已登記，請接著輸入您的 LINE ID～"))
+            return
+
+        # 接收 LINE ID
+        if user_id in pending_verification and not pending_verification[user_id].get("line_id"):
+            pending_verification[user_id]["line_id"] = user_text
+            phone = pending_verification[user_id]["phone"]
+            name = pending_verification[user_id]["name"]
+            reply = (
+                f"📱 {phone}\n"
+                f"🧸 暱稱：{name}\n"
+                f"🔗 LINE ID：{user_text}\n"
+                f"請問以上資料是否正確？\n正確請回覆 1"
+            )
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
             return
 
-        # 非手機號碼，視為 LINE ID 補充
-        latest = (
-            Whitelist.query
-            .filter_by(name=display_name)
-            .filter(Whitelist.line_id == None)
-            .order_by(Whitelist.created_at.desc())
-            .first()
-        )
-        if latest:
-            latest.line_id = user_text
+        # 確認輸入 1
+        if user_text == "1" and user_id in pending_verification:
+            data = pending_verification.pop(user_id)
+            new_white = Whitelist(
+                date=datetime.now().strftime("%Y-%m-%d"),
+                phone=data["phone"],
+                line_id=data["line_id"],
+                reason="驗證完成",
+                name=data["name"]
+            )
+            db.session.add(new_white)
             db.session.commit()
             reply = (
-                f"📱 {latest.phone}\n"
-                f"🧸 暱稱：{latest.name or display_name}\n"
-                f"🔗 LINE ID：{latest.line_id}\n"
-                f"🕒 {latest.created_at.strftime('%Y/%m/%d %H:%M:%S')}\n"
+                f"📱 {new_white.phone}\n"
+                f"🧸 暱稱：{new_white.name}\n"
+                f"       個人編號：\n"
+                f"🔗 LINE ID：{new_white.line_id}\n"
+                f"🕒 {new_white.created_at.strftime('%Y/%m/%d %H:%M:%S')}\n"
                 f"✅ 驗證成功，歡迎加入茗殿"
             )
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
