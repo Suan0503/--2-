@@ -123,7 +123,7 @@ def handle_message(event):
             f"🌸 暱稱：{record['name']}\n"
             f"       個人編號：待驗證後產生\n"
             f"🔗 LINE ID：{record['line_id']}\n"
-            f"請問以上資料是否正確？正確請回復 1"
+            f"請問以上資料是否正確？資料一經送出無法修改，如正確請回復 1"
         )
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
         return
