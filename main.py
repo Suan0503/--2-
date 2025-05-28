@@ -1,5 +1,3 @@
-# 修正後 main.py（已驗證用戶不可再登記，輸入自己手機可查詢資訊）
-
 from flask import Flask, request, abort
 from flask_sqlalchemy import SQLAlchemy
 from linebot import LineBotApi, WebhookHandler
@@ -23,9 +21,10 @@ LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET")
 line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
-ADMINS = ["U8f3cc921a9dd18d3e257008a34dd07c1"]
-admin_mode = set()
+# 暫存使用者輸入流程資料
+temp_users = {}
 
+# 白名單資料表
 class Whitelist(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     created_at = db.Column(db.DateTime, default=datetime.now, nullable=False)
@@ -36,6 +35,7 @@ class Whitelist(db.Model):
     line_id = db.Column(db.String(100))
     line_user_id = db.Column(db.String(255), unique=True)
 
+# 黑名單資料表
 class Blacklist(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     created_at = db.Column(db.DateTime, default=datetime.now, nullable=False)
@@ -70,7 +70,7 @@ def handle_follow(event):
     msg = (
         "歡迎加入🍵茗殿🍵\n"
         "請正確按照步驟提供資料配合快速驗證\n\n"
-        "➡️ \033[1m請輸入手機號碼進行驗證（含09開頭）\033[0m"
+        "➡️ 請輸入手機號碼進行驗證（含09開頭）"
     )
     line_bot_api.reply_message(event.reply_token, TextSendMessage(text=msg))
 
@@ -82,39 +82,38 @@ def handle_message(event):
     profile = line_bot_api.get_profile(user_id)
     display_name = profile.display_name
 
-    # 已驗證的使用者
+    # 判斷是否為已驗證用戶
     existing = Whitelist.query.filter_by(line_user_id=user_id).first()
     if existing:
         if user_text == existing.phone:
             reply = (
-                f"\ud83d\udcf1 {existing.phone}\n"
-                f"\ud83c\udf38 暱稱：{existing.name or display_name}\n"
+                f"📱 {existing.phone}\n"
+                f"🧸 暱稱：{existing.name or display_name}\n"
                 f"       個人編號：\n"
-                f"\ud83d\udd17 LINE ID：{existing.line_id or '未登記'}\n"
-                f"\ud83d\udd52 {existing.created_at.strftime('%Y/%m/%d %H:%M:%S')}\n"
-                f"\u2705 驗證成功，歡迎加入茗殿"
+                f"🔗 LINE ID：{existing.line_id or '未登記'}\n"
+                f"🕒 {existing.created_at.strftime('%Y/%m/%d %H:%M:%S')}\n"
+                f"✅ 驗證成功，歡迎加入茗殿"
             )
         else:
-            reply = "\u26a0\ufe0f 你已驗證完成，請輸入手機號碼查看驗證資訊"
+            reply = "⚠️ 你已驗證完成，請輸入手機號碼查看驗證資訊"
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
         return
 
-    # 黑名單封鎖
-    if re.match(r"^09\\d{8}$", user_text):
-        black = Blacklist.query.filter_by(phone=user_text).first()
-        if black:
+    # 使用者輸入的是手機號碼
+    if re.match(r"^09\d{8}$", user_text):
+        # 黑名單檢查
+        if Blacklist.query.filter_by(phone=user_text).first():
             return
 
-        # 若手機已被使用
-        repeated = Whitelist.query.filter_by(phone=user_text).first()
-        if repeated:
-            reply = "\u26a0\ufe0f 此手機號碼已被使用，請輸入正確的手機號碼"
+        # 手機已被使用
+        if Whitelist.query.filter_by(phone=user_text).first():
+            reply = "⚠️ 此手機號碼已被使用，請輸入正確的手機號碼"
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
             return
 
-        # 尚未登記，等待輸入 LINE ID
+        # 登記進暫存流程
         temp_users[user_id] = {"phone": user_text, "name": display_name}
-        reply = "\ud83d\udcf1 手機已登記，請接著輸入您的 LINE ID～"
+        reply = "📱 手機已登記，請接著輸入您的 LINE ID～"
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
         return
 
@@ -123,18 +122,17 @@ def handle_message(event):
         record = temp_users[user_id]
         record["line_id"] = user_text
         temp_users[user_id] = record
-
         reply = (
-            f"\ud83d\udcf1 {record['phone']}\n"
-            f"\ud83c\udf38 暱稱：{record['name']}\n"
+            f"📱 {record['phone']}\n"
+            f"🧸 暱稱：{record['name']}\n"
             f"       個人編號：\n"
-            f"\ud83d\udd17 LINE ID：{record['line_id']}\n"
+            f"🔗 LINE ID：{record['line_id']}\n"
             f"請問以上資料是否正確？正確請回復 1"
         )
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
         return
 
-    # 確認後存入資料庫
+    # 確認後儲存資料
     if user_text == "1" and user_id in temp_users:
         data = temp_users[user_id]
         new_user = Whitelist(
@@ -148,20 +146,16 @@ def handle_message(event):
         db.session.commit()
 
         reply = (
-            f"\ud83d\udcf1 {new_user.phone}\n"
-            f"\ud83c\udf38 暱稱：{new_user.name}\n"
+            f"📱 {new_user.phone}\n"
+            f"🧸 暱稱：{new_user.name}\n"
             f"       個人編號：\n"
-            f"\ud83d\udd17 LINE ID：{new_user.line_id}\n"
-            f"\ud83d\udd52 {new_user.created_at.strftime('%Y/%m/%d %H:%M:%S')}\n"
-            f"\u2705 驗證成功，歡迎加入茗殿"
+            f"🔗 LINE ID：{new_user.line_id}\n"
+            f"🕒 {new_user.created_at.strftime('%Y/%m/%d %H:%M:%S')}\n"
+            f"✅ 驗證成功，歡迎加入茗殿"
         )
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
         temp_users.pop(user_id)
         return
-
-# 暫存記憶資料結構
-# line_user_id => { phone, name, line_id }
-temp_users = {}
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
