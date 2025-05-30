@@ -1,3 +1,4 @@
+print("🟢 進入 main.py 開始啟動 Flask")
 from flask import Flask, request, abort
 from flask_sqlalchemy import SQLAlchemy
 from linebot import LineBotApi, WebhookHandler
