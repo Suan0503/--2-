@@ -1,11 +1,13 @@
 FROM python:3.11-slim
 
+# 安裝系統套件 + tesseract-ocr
 RUN apt-get update && apt-get install -y \
-    gcc \
-    build-essential \
-    libffi-dev \
     tesseract-ocr \
- && rm -rf /var/lib/apt/lists/*
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -14,4 +16,4 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 
 COPY . .
 
-CMD ["gunicorn", "-b", "0.0.0.0:8000", "main:app"]
+CMD ["gunicorn", "main:app", "--bind", "0.0.0.0:8000"]
