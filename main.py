@@ -1,10 +1,7 @@
 from flask import Flask, request, abort
 from flask_sqlalchemy import SQLAlchemy
 from linebot import LineBotApi, WebhookHandler
-from linebot.models import (
-    MessageEvent, TextMessage, TextSendMessage,
-    FlexSendMessage, FollowEvent
-)
+from linebot.models import MessageEvent, TextMessage, TextSendMessage, FlexSendMessage, FollowEvent
 from linebot.exceptions import InvalidSignatureError
 from datetime import datetime
 from dotenv import load_dotenv
@@ -53,6 +50,44 @@ class Coupon(db.Model):
     amount = db.Column(db.Integer)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
+def get_function_menu_flex():
+    return FlexSendMessage(
+        alt_text="功能選單",
+        contents={
+            "type": "bubble",
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "spacing": "md",
+                "contents": [
+                    {"type": "text", "text": "✨ 功能選單 ✨", "weight": "bold", "size": "lg", "align": "center"},
+                    {"type": "separator"},
+                    {
+                        "type": "box",
+                        "layout": "vertical",
+                        "margin": "lg",
+                        "spacing": "sm",
+                        "contents": [
+                            {"type": "button", "action": {"type": "message", "label": "📱 驗證資訊", "text": "驗證資訊"}, "style": "primary", "color": "#00C37E"},
+                            {"type": "button", "action": {"type": "message", "label": "📅 每日班表", "text": "每日班表"}, "style": "primary", "color": "#00B1E5"},
+                            {"type": "button", "action": {"type": "message", "label": "🎁 每日抽獎", "text": "每日抽獎"}, "style": "primary", "color": "#FF9900"},
+                            {"type": "button", "action": {"type": "uri", "label": "📬 預約諮詢", "uri": choose_link()}, "style": "primary", "color": "#B889F2"}
+                        ]
+                    }
+                ]
+            }
+        }
+    )
+
+def choose_link():
+    import hashlib
+    group = [
+        "https://line.me/ti/p/g7TPO_lhAL",
+        "https://line.me/ti/p/Q6-jrvhXbH",
+        "https://line.me/ti/p/AKRUvSCLRC"
+    ]
+    return group[hash(os.urandom(8)) % len(group)]
+
 @app.route("/")
 def home():
     return "LINE Bot 正常運作中～🍵"
@@ -88,7 +123,6 @@ def handle_message(event):
     profile = line_bot_api.get_profile(user_id)
     display_name = profile.display_name
 
-    # ✅ 每日抽獎功能
     if user_text == "每日抽獎":
         today_str = datetime.now(tz).strftime("%Y-%m-%d")
         if has_drawn_today(user_id, Coupon):
@@ -106,21 +140,22 @@ def handle_message(event):
     existing = Whitelist.query.filter_by(line_user_id=user_id).first()
     if existing:
         if user_text == existing.phone:
-            reply_text = (
+            reply = (
                 f"📱 {existing.phone}\n"
                 f"🌸 暱稱：{existing.name or display_name}\n"
                 f"       個人編號：{existing.id}\n"
                 f"🔗 LINE ID：{existing.line_id or '未登記'}\n"
-                f"🕒 驗證時間：{existing.created_at.astimezone(tz).strftime('%Y/%m/%d %H:%M:%S')}\n"
+                f"🕒 {existing.created_at.astimezone(tz).strftime('%Y/%m/%d %H:%M:%S')}\n"
                 f"✅ 驗證成功，歡迎加入茗殿"
             )
-            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
+            line_bot_api.reply_message(event.reply_token, [TextSendMessage(text=reply), get_function_menu_flex()])
         else:
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="⚠️ 你已驗證完成，請輸入手機號碼查看驗證資訊"))
         return
 
     if re.match(r"^09\d{8}$", user_text):
-        if Blacklist.query.filter_by(phone=user_text).first():
+        black = Blacklist.query.filter_by(phone=user_text).first()
+        if black:
             return
 
         repeated = Whitelist.query.filter_by(phone=user_text).first()
@@ -137,14 +172,14 @@ def handle_message(event):
         record["line_id"] = user_text
         temp_users[user_id] = record
 
-        confirm_text = (
+        reply = (
             f"📱 {record['phone']}\n"
             f"🌸 暱稱：{record['name']}\n"
             f"       個人編號：待驗證後產生\n"
             f"🔗 LINE ID：{record['line_id']}\n"
-            f"請問以上資料是否正確？資料一經送出無法修改，如正確請回復 1"
+            f"請問以上資料是否正確？正確請回復 1"
         )
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=confirm_text))
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
         return
 
     if user_text == "1" and user_id in temp_users:
@@ -173,7 +208,7 @@ def handle_message(event):
             saved_id = new_user.id
             created_time = now.strftime('%Y/%m/%d %H:%M:%S')
 
-        success_text = (
+        reply = (
             f"📱 {data['phone']}\n"
             f"🌸 暱稱：{data['name']}\n"
             f"       個人編號：{saved_id}\n"
@@ -181,7 +216,7 @@ def handle_message(event):
             f"🕒 {created_time}\n"
             f"✅ 驗證成功，歡迎加入茗殿"
         )
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=success_text))
+        line_bot_api.reply_message(event.reply_token, [TextSendMessage(text=reply), get_function_menu_flex()])
         temp_users.pop(user_id)
         return
 
