@@ -7,3 +7,5 @@ oauth2client
 python-dotenv
 psycopg2-binary
 pytz
+pytesseract
+Pillow
