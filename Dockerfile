@@ -11,4 +11,4 @@ WORKDIR /app
 COPY . /app
 RUN pip install --no-cache-dir -r requirements.txt
 
-CMD exec gunicorn --bind :8000 --timeout 60 main:app
+CMD ["gunicorn", "-b", "0.0.0.0:$PORT", "main:app"]
