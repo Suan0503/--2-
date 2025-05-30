@@ -1,10 +1,7 @@
 from flask import Flask, request, abort
 from flask_sqlalchemy import SQLAlchemy
 from linebot import LineBotApi, WebhookHandler
-from linebot.models import (
-    MessageEvent, TextMessage, TextSendMessage, FlexSendMessage, FollowEvent, URIAction, ButtonComponent,
-    BubbleContainer, BoxComponent, TextComponent
-)
+from linebot.models import MessageEvent, TextMessage, TextSendMessage, FlexSendMessage, FollowEvent, URIAction
 from linebot.exceptions import InvalidSignatureError
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
@@ -12,7 +9,7 @@ import os
 import re
 import traceback
 import pytz
-from draw_utils import draw_coupon, get_today_coupon_flex, has_drawn_today, save_coupon_record
+from draw_utils import draw_coupon, get_today_coupon_flex, has_drawn_today_v2, save_coupon_record
 
 load_dotenv()
 
@@ -105,7 +102,7 @@ def handle_message(event):
 
     if user_text == "每日抽獎":
         today_str = datetime.now(tz).strftime("%Y-%m-%d")
-        if has_drawn_today(db, user_id, today_str):
+        if has_drawn_today_v2(user_id, today_str):
             coupon = Coupon.query.filter_by(line_user_id=user_id, date=today_str).first()
             flex = get_today_coupon_flex(user_id, display_name, coupon.amount)
             line_bot_api.reply_message(event.reply_token, flex)
@@ -129,25 +126,26 @@ def handle_message(event):
             )
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
 
-            # ✅ 驗證成功後推送 Flex 選單
-            menu_flex = FlexSendMessage(
+            rich_menu = FlexSendMessage(
                 alt_text="功能選單",
                 contents={
                     "type": "bubble",
+                    "size": "mega",
                     "body": {
                         "type": "box",
                         "layout": "vertical",
+                        "spacing": "md",
                         "contents": [
-                            {"type": "text", "text": "✨ 功能選單 ✨", "weight": "bold", "size": "lg", "margin": "md"},
-                            {"type": "button", "style": "primary", "action": {"type": "message", "label": "📱 驗證資訊", "text": "驗證資訊"}},
-                            {"type": "button", "style": "primary", "action": {"type": "uri", "label": "📅 每日班表", "uri": "https://t.me/+XgwLCJ6kdhhhZDE1"}},
-                            {"type": "button", "style": "primary", "action": {"type": "message", "label": "🎁 每日抽獎", "text": "每日抽獎"}},
-                            {"type": "button", "style": "primary", "action": {"type": "uri", "label": "📬 預約諮詢", "uri": get_appointment_link(user_id)}}
+                            {"type": "text", "text": "✨ 功能選單 ✨", "weight": "bold", "size": "xl", "align": "center"},
+                            {"type": "button", "style": "primary", "color": "#00C300", "action": {"type": "message", "label": "📱 驗證資訊", "text": existing.phone}},
+                            {"type": "button", "style": "primary", "color": "#00C300", "action": {"type": "uri", "label": "📅 每日班表", "uri": "https://t.me/+XgwLCJ6kdhhhZDE1"}},
+                            {"type": "button", "style": "primary", "color": "#00C300", "action": {"type": "message", "label": "🎁 每日抽獎", "text": "每日抽獎"}},
+                            {"type": "button", "style": "primary", "color": "#00C300", "action": {"type": "uri", "label": "📬 預約諮詢", "uri": get_appointment_link(user_id)}}
                         ]
                     }
                 }
             )
-            line_bot_api.push_message(user_id, menu_flex)
+            line_bot_api.push_message(user_id, rich_menu)
         else:
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="⚠️ 你已驗證完成，請輸入手機號碼查看驗證資訊"))
         return
