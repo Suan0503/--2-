@@ -69,7 +69,15 @@ def get_function_menu_flex():
                         "spacing": "sm",
                         "contents": [
                             {"type": "button", "action": {"type": "message", "label": "📱 驗證資訊", "text": "驗證資訊"}, "style": "primary", "color": "#00C37E"},
-                            {"type": "button", "action": {"type": "message", "label": "📅 每日班表", "text": "每日班表"}, "style": "primary", "color": "#00B1E5"},
+                            {
+  "type": "button",
+  "action": {
+    "type": "uri",
+    "label": "📅 每日班表",
+    "uri": "https://t.me/+XgwLCJ6kdhhhZDE1"
+  },
+  "style": "link"
+},
                             {"type": "button", "action": {"type": "message", "label": "🎁 每日抽獎", "text": "每日抽獎"}, "style": "primary", "color": "#FF9900"},
                             {"type": "button", "action": {"type": "uri", "label": "📬 預約諮詢", "uri": choose_link()}, "style": "primary", "color": "#B889F2"}
                         ]
