@@ -1,12 +1,9 @@
 Flask
 gunicorn
-waitress
 flask_sqlalchemy
 line-bot-sdk==2.4.1
-gspread
-oauth2client
 python-dotenv
-psycopg2-binary
 pytz
 pytesseract
 Pillow
+psycopg2-binary
