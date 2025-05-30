@@ -1,11 +1,9 @@
 Flask
-flask_sqlalchemy
 gunicorn
+flask_sqlalchemy
 line-bot-sdk==2.4.1
-oauth2client
-Pillow
-psycopg2-binary
-python-dotenv
-pytesseract
-pytz
 gspread
+oauth2client
+python-dotenv
+psycopg2-binary
+pytz
