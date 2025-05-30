@@ -1,7 +1,7 @@
 from flask import Flask, request, abort
 from flask_sqlalchemy import SQLAlchemy
 from linebot import LineBotApi, WebhookHandler
-from linebot.models import MessageEvent, TextMessage, TextSendMessage, FlexSendMessage, FollowEvent
+from linebot.models import MessageEvent, TextMessage, TextSendMessage, FollowEvent, FlexSendMessage
 from linebot.exceptions import InvalidSignatureError
 from datetime import datetime
 from dotenv import load_dotenv
@@ -9,6 +9,7 @@ import os
 import re
 import traceback
 import pytz
+import random
 
 load_dotenv()
 
@@ -23,8 +24,13 @@ line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
 ADMINS = ["U8f3cc921a9dd18d3e257008a34dd07c1"]
-admin_mode = set()
 temp_users = {}  # line_user_id => { phone, name, line_id }
+redirect_links = {
+    "a": "https://line.me/ti/p/g7TPO_lhAL",
+    "b": "https://line.me/ti/p/Q6-jrvhXbH",
+    "c": "https://line.me/ti/p/AKRUvSCLRC"
+}
+assigned_redirect = {}  # line_user_id => one of a/b/c
 
 class Whitelist(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -91,22 +97,25 @@ def handle_message(event):
                 f"✅ 驗證成功，歡迎加入茗殿"
             )
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
+            push_flex_menu(user_id)
         else:
-            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="⚠️ 你已驗證完成，請輸入手機號碼查看驗證資訊"))
+            reply = "⚠️ 你已驗證完成，請輸入手機號碼查看驗證資訊"
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
         return
 
     if re.match(r"^09\d{8}$", user_text):
         black = Blacklist.query.filter_by(phone=user_text).first()
         if black:
             return
-
         repeated = Whitelist.query.filter_by(phone=user_text).first()
         if repeated and repeated.line_user_id:
-            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="⚠️ 此手機號碼已被使用，請輸入正確的手機號碼"))
+            reply = "⚠️ 此手機號碼已被使用，請輸入正確的手機號碼"
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
             return
 
         temp_users[user_id] = {"phone": user_text, "name": display_name}
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text="📱 手機已登記，請接著輸入您的 LINE ID～"))
+        reply = "📱 手機已登記，請接著輸入您的 LINE ID～"
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
         return
 
     if user_id in temp_users and len(user_text) >= 4:
@@ -150,56 +159,60 @@ def handle_message(event):
             saved_id = new_user.id
             created_time = now.strftime('%Y/%m/%d %H:%M:%S')
 
-        flex_message = {
-            "type": "flex",
-            "altText": "✅ 驗證成功，歡迎加入茗殿",
-            "contents": {
-                "type": "bubble",
-                "size": "kilo",
-                "header": {
-                    "type": "box",
-                    "layout": "vertical",
-                    "contents": [
-                        {"type": "text", "text": "✅ 驗證成功", "weight": "bold", "size": "lg", "color": "#00BB00"},
-                        {"type": "text", "text": "歡迎加入 🍵茗殿🍵", "size": "md"}
-                    ]
-                },
-                "body": {
-                    "type": "box",
-                    "layout": "vertical",
-                    "spacing": "md",
-                    "contents": [
-                        {"type": "text", "text": f"📱 {data['phone']}", "size": "sm"},
-                        {"type": "text", "text": f"🌸 暱稱：{data['name']}", "size": "sm"},
-                        {"type": "text", "text": f"🔗 LINE ID：{data['line_id']}", "size": "sm"},
-                        {"type": "text", "text": f"🕒 {created_time}", "size": "sm"}
-                    ]
-                },
-                "footer": {
-                    "type": "box",
-                    "layout": "vertical",
-                    "spacing": "sm",
-                    "contents": [
-                        {"type": "button", "action": {"type": "message", "label": "📲 驗證資訊", "text": data['phone']}, "style": "primary"},
-                        {"type": "button", "action": {"type": "uri", "label": "📝 每日班表", "uri": "https://lin.ee/YOUR_SCHEDULE_LINK"}, "style": "secondary"},
-                        {"type": "button", "action": {"type": "uri", "label": "🆕 新品上架", "uri": "https://lin.ee/YOUR_NEW_LINK"}, "style": "secondary"},
-                        {"type": "button", "action": {"type": "uri", "label": "💬 預約諮詢", "uri": get_consult_link(user_id)}, "style": "link"}
-                    ]
-                }
-            }
-        }
-        line_bot_api.reply_message(event.reply_token, [TextSendMessage(text="✅ 驗證成功～以下功能可選："), FlexSendMessage.new_from_json_dict(flex_message)])
+        reply = (
+            f"📱 {data['phone']}\n"
+            f"🌸 暱稱：{data['name']}\n"
+            f"       個人編號：{saved_id}\n"
+            f"🔗 LINE ID：{data['line_id']}\n"
+            f"🕒 {created_time}\n"
+            f"✅ 驗證成功，歡迎加入茗殿"
+        )
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
         temp_users.pop(user_id)
+        push_flex_menu(user_id)
         return
 
-def get_consult_link(user_id):
-    links = [
-        "https://line.me/ti/p/g7TPO_lhAL",
-        "https://line.me/ti/p/Q6-jrvhXbH",
-        "https://line.me/ti/p/AKRUvSCLRC"
-    ]
-    hash_value = sum(ord(c) for c in user_id)
-    return links[hash_value % len(links)]
+def push_flex_menu(user_id):
+    if user_id not in assigned_redirect:
+        assigned_redirect[user_id] = random.choice(["a", "b", "c"])
+    consult_url = redirect_links[assigned_redirect[user_id]]
+
+    bubble = {
+        "type": "bubble",
+        "body": {
+            "type": "box",
+            "layout": "vertical",
+            "contents": [
+                {"type": "text", "text": "✅ 功能選單", "weight": "bold", "size": "lg", "margin": "md"},
+                {"type": "separator", "margin": "md"},
+                {
+                    "type": "button",
+                    "action": {"type": "message", "label": "驗證資訊", "text": "驗證資訊"},
+                    "style": "primary",
+                    "margin": "md"
+                },
+                {
+                    "type": "button",
+                    "action": {"type": "uri", "label": "每日班表", "uri": "https://line.me/ti/p/@linebot"},
+                    "style": "primary",
+                    "margin": "md"
+                },
+                {
+                    "type": "button",
+                    "action": {"type": "uri", "label": "新品上架", "uri": "https://line.me/ti/p/@linebot"},
+                    "style": "primary",
+                    "margin": "md"
+                },
+                {
+                    "type": "button",
+                    "action": {"type": "uri", "label": "預約諮詢", "uri": consult_url},
+                    "style": "primary",
+                    "margin": "md"
+                }
+            ]
+        }
+    }
+    line_bot_api.push_message(user_id, FlexSendMessage(alt_text="功能選單", contents=bubble))
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
