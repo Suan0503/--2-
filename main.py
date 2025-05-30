@@ -1,23 +1,23 @@
 from flask import Flask, request, abort
 from flask_sqlalchemy import SQLAlchemy
 from linebot import LineBotApi, WebhookHandler
-from linebot.models import MessageEvent, TextMessage, TextSendMessage, FollowEvent, FlexSendMessage
+from linebot.models import MessageEvent, TextMessage, TextSendMessage, FlexSendMessage, FollowEvent
 from linebot.exceptions import InvalidSignatureError
-from datetime import datetime
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 import os
 import re
 import traceback
 import pytz
-import random
+from draw_utils import draw_coupon, get_today_coupon_flex, has_drawn_today, save_coupon_record
 
 load_dotenv()
 
 app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-db = SQLAlchemy(app)
 
+db = SQLAlchemy(app)
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
 LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET")
 line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
@@ -25,12 +25,6 @@ handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
 ADMINS = ["U8f3cc921a9dd18d3e257008a34dd07c1"]
 temp_users = {}  # line_user_id => { phone, name, line_id }
-redirect_links = {
-    "a": "https://line.me/ti/p/g7TPO_lhAL",
-    "b": "https://line.me/ti/p/Q6-jrvhXbH",
-    "c": "https://line.me/ti/p/AKRUvSCLRC"
-}
-assigned_redirect = {}  # line_user_id => one of a/b/c
 
 class Whitelist(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -49,6 +43,13 @@ class Blacklist(db.Model):
     phone = db.Column(db.String(20), unique=True)
     reason = db.Column(db.Text)
     name = db.Column(db.String(255))
+
+class Coupon(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    line_user_id = db.Column(db.String(255))
+    date = db.Column(db.String(20))
+    amount = db.Column(db.Integer)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
 @app.route("/")
 def home():
@@ -85,6 +86,21 @@ def handle_message(event):
     profile = line_bot_api.get_profile(user_id)
     display_name = profile.display_name
 
+    # ✅ 抽獎功能
+    if user_text == "每日抽獎":
+        today_str = datetime.now(tz).strftime("%Y-%m-%d")
+        if has_drawn_today(db, user_id, today_str):
+            coupon = Coupon.query.filter_by(line_user_id=user_id, date=today_str).first()
+            flex = get_today_coupon_flex(user_id, display_name, coupon.amount)
+            line_bot_api.reply_message(event.reply_token, flex)
+            return
+
+        amount = draw_coupon()
+        save_coupon_record(db, user_id, amount)
+        flex = get_today_coupon_flex(user_id, display_name, amount)
+        line_bot_api.reply_message(event.reply_token, flex)
+        return
+
     existing = Whitelist.query.filter_by(line_user_id=user_id).first()
     if existing:
         if user_text == existing.phone:
@@ -96,17 +112,16 @@ def handle_message(event):
                 f"🕒 {existing.created_at.astimezone(tz).strftime('%Y/%m/%d %H:%M:%S')}\n"
                 f"✅ 驗證成功，歡迎加入茗殿"
             )
-            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
-            push_flex_menu(user_id)
         else:
             reply = "⚠️ 你已驗證完成，請輸入手機號碼查看驗證資訊"
-            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
         return
 
     if re.match(r"^09\d{8}$", user_text):
         black = Blacklist.query.filter_by(phone=user_text).first()
         if black:
             return
+
         repeated = Whitelist.query.filter_by(phone=user_text).first()
         if repeated and repeated.line_user_id:
             reply = "⚠️ 此手機號碼已被使用，請輸入正確的手機號碼"
@@ -169,50 +184,7 @@ def handle_message(event):
         )
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
         temp_users.pop(user_id)
-        push_flex_menu(user_id)
         return
-
-def push_flex_menu(user_id):
-    if user_id not in assigned_redirect:
-        assigned_redirect[user_id] = random.choice(["a", "b", "c"])
-    consult_url = redirect_links[assigned_redirect[user_id]]
-
-    bubble = {
-        "type": "bubble",
-        "body": {
-            "type": "box",
-            "layout": "vertical",
-            "contents": [
-                {"type": "text", "text": "✅ 功能選單", "weight": "bold", "size": "lg", "margin": "md"},
-                {"type": "separator", "margin": "md"},
-                {
-                    "type": "button",
-                    "action": {"type": "message", "label": "驗證資訊", "text": "驗證資訊"},
-                    "style": "primary",
-                    "margin": "md"
-                },
-                {
-                    "type": "button",
-                    "action": {"type": "uri", "label": "每日班表", "uri": "https://line.me/ti/p/@linebot"},
-                    "style": "primary",
-                    "margin": "md"
-                },
-                {
-                    "type": "button",
-                    "action": {"type": "uri", "label": "新品上架", "uri": "https://line.me/ti/p/@linebot"},
-                    "style": "primary",
-                    "margin": "md"
-                },
-                {
-                    "type": "button",
-                    "action": {"type": "uri", "label": "預約諮詢", "uri": consult_url},
-                    "style": "primary",
-                    "margin": "md"
-                }
-            ]
-        }
-    }
-    line_bot_api.push_message(user_id, FlexSendMessage(alt_text="功能選單", contents=bubble))
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
