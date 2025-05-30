@@ -1,6 +1,3 @@
-# 問題原因是你 main.py 嘗試 import `has_drawn_today_v2`，但 draw_utils.py 裡只有 `has_drawn_today`。
-# 所以這裡直接修正並提供完整版本。
-
 from flask import Flask, request, abort
 from flask_sqlalchemy import SQLAlchemy
 from linebot import LineBotApi, WebhookHandler
@@ -57,9 +54,61 @@ class Coupon(db.Model):
     amount = db.Column(db.Integer)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
+def get_function_menu_flex():
+    return FlexSendMessage(
+        alt_text="\u2728\u529f\u80fd\u9078\u55ae\u2728",
+        contents={
+            "type": "bubble",
+            "size": "mega",
+            "body": {
+                "type": "box",
+                "layout": "vertical",
+                "spacing": "lg",
+                "contents": [
+                    {
+                        "type": "text",
+                        "text": "\u2728 \u529f\u80fd\u9078\u55ae \u2728",
+                        "weight": "bold",
+                        "size": "lg",
+                        "align": "center",
+                        "color": "#333333"
+                    },
+                    {
+                        "type": "button",
+                        "action": {"type": "message", "label": "\ud83d\udcf1 \u9a57\u8b49\u8cc7\u8a0a", "text": "\u9a57\u8b49\u8cc7\u8a0a"},
+                        "style": "primary",
+                        "color": "#33CC99"
+                    },
+                    {
+                        "type": "button",
+                        "action": {"type": "message", "label": "\ud83d\uddd5\ufe0f \u6bcf\u65e5\u73ed\u8868", "text": "\u6bcf\u65e5\u73ed\u8868"},
+                        "style": "primary",
+                        "color": "#33CC99"
+                    },
+                    {
+                        "type": "button",
+                        "action": {"type": "message", "label": "\ud83c\udf81 \u6bcf\u65e5\u62bd\u734e", "text": "\u6bcf\u65e5\u62bd\u734e"},
+                        "style": "primary",
+                        "color": "#33CC99"
+                    },
+                    {
+                        "type": "button",
+                        "action": {
+                            "type": "uri",
+                            "label": "\ud83d\udcd6 \u9810\u7d04\u8aee\u8a62",
+                            "uri": "https://line.me/ti/p/g7TPO_lhAL"
+                        },
+                        "style": "primary",
+                        "color": "#33CC99"
+                    }
+                ]
+            }
+        }
+    )
+
 @app.route("/")
 def home():
-    return "LINE Bot 正常運作中～🍵"
+    return "LINE Bot \u6b63\u5e38\u904b\u4f5c\u4e2d\uff5e\ud83c\udf75"
 
 @app.route("/callback", methods=["POST"])
 def callback():
@@ -70,7 +119,7 @@ def callback():
     except InvalidSignatureError:
         abort(400)
     except Exception as e:
-        print("❗ callback 發生例外：", e)
+        print("\u2757 callback \u767c\u751f\u4f8b\u5916\uff1a", e)
         traceback.print_exc()
         abort(500)
     return "OK"
@@ -78,9 +127,9 @@ def callback():
 @handler.add(FollowEvent)
 def handle_follow(event):
     msg = (
-        "歡迎加入🍵茗殿🍵\n"
-        "請正確按照步驟提供資料配合快速驗證\n\n"
-        "➡️ 請輸入手機號碼進行驗證（含09開頭）"
+        "\u6b61\u8fce\u52a0\u5165\ud83c\udf75\u83ef\u6bbf\ud83c\udf75\n"
+        "\u8acb\u6b63\u78ba\u6309\u7167\u6b65\u9a5f\u63d0\u4f9b\u8cc7\u6599\u914d\u5408\u5feb\u901f\u9a57\u8b49\n\n"
+        "\u27a1\ufe0f \u8acb\u8f38\u5165\u624b\u6a5f\u865f\u78bc\u9032\u884c\u9a57\u8b49\uff08\u542b09\u958b\u982d\uff09"
     )
     line_bot_api.reply_message(event.reply_token, TextSendMessage(text=msg))
 
@@ -92,8 +141,7 @@ def handle_message(event):
     profile = line_bot_api.get_profile(user_id)
     display_name = profile.display_name
 
-    # ✅ 抽獎功能
-    if user_text == "每日抽獎":
+    if user_text == "\u6bcf\u65e5\u62bd\u734e":
         today_str = datetime.now(tz).strftime("%Y-%m-%d")
         if has_drawn_today(user_id, Coupon):
             coupon = Coupon.query.filter_by(line_user_id=user_id, date=today_str).first()
@@ -107,59 +155,54 @@ def handle_message(event):
         line_bot_api.reply_message(event.reply_token, flex)
         return
 
-    # ✅ 驗證查詢
     existing = Whitelist.query.filter_by(line_user_id=user_id).first()
     if existing:
         if user_text == existing.phone:
             reply = (
-                f"📱 {existing.phone}\n"
-                f"🌸 暱稱：{existing.name or display_name}\n"
-                f"       個人編號：{existing.id}\n"
-                f"🔗 LINE ID：{existing.line_id or '未登記'}\n"
-                f"🕒 {existing.created_at.astimezone(tz).strftime('%Y/%m/%d %H:%M:%S')}\n"
-                f"✅ 驗證成功，歡迎加入茗殿"
+                f"\ud83d\udcf1 {existing.phone}\n"
+                f"\ud83c\udf38 \u66c9\u540d\uff1a{existing.name or display_name}\n"
+                f"       \u500b\u4eba\u7de8\u865f\uff1a{existing.id}\n"
+                f"\ud83d\udd17 LINE ID\uff1a{existing.line_id or ' \u672a\u767c\u9001'}\n"
+                f"\ud83d\udd52 {existing.created_at.astimezone(tz).strftime('%Y/%m/%d %H:%M:%S')}\n"
+                f"\u2705 \u9a57\u8b49\u6210\u529f\uff0c\u6b61\u8fce\u52a0\u5165\u83ef\u6bbf"
             )
+            line_bot_api.reply_message(event.reply_token, [
+                TextSendMessage(text=reply),
+                get_function_menu_flex()
+            ])
         else:
-            reply = "⚠️ 你已驗證完成，請輸入手機號碼查看驗證資訊"
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="\u26a0\ufe0f \u4f60\u5df2\u9a57\u8b49\u5b8c\u6210\uff0c\u8acb\u8f38\u5165\u624b\u6a5f\u865f\u78bc\u67e5\u770b\u9a57\u8b49\u8cc7\u8a0a"))
         return
 
     if re.match(r"^09\d{8}$", user_text):
         black = Blacklist.query.filter_by(phone=user_text).first()
         if black:
             return
-
         repeated = Whitelist.query.filter_by(phone=user_text).first()
         if repeated and repeated.line_user_id:
-            reply = "⚠️ 此手機號碼已被使用，請輸入正確的手機號碼"
-            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="\u26a0\ufe0f \u6b64\u624b\u6a5f\u865f\u78bc\u5df2\u88ab\u4f7f\u7528"))
             return
-
         temp_users[user_id] = {"phone": user_text, "name": display_name}
-        reply = "📱 手機已登記，請接著輸入您的 LINE ID～"
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text="\ud83d\udcf1 \u624b\u6a5f\u5df2\u767b\u8a18\uff0c\u8acb\u8f38\u5165 LINE ID~"))
         return
 
     if user_id in temp_users and len(user_text) >= 4:
         record = temp_users[user_id]
         record["line_id"] = user_text
         temp_users[user_id] = record
-
-        reply = (
-            f"📱 {record['phone']}\n"
-            f"🌸 暱稱：{record['name']}\n"
-            f"       個人編號：待驗證後產生\n"
-            f"🔗 LINE ID：{record['line_id']}\n"
-            f"請問以上資料是否正確？資料一經送出無法修改，如正確請回復 1"
-        )
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=(
+            f"\ud83d\udcf1 {record['phone']}\n"
+            f"\ud83c\udf38 \u66c9\u540d\uff1a{record['name']}\n"
+            f"       \u500b\u4eba\u7de8\u865f\uff1a\u5f85\u9a57\u8b49\u5f8c\u7522\u751f\n"
+            f"\ud83d\udd17 LINE ID\uff1a{record['line_id']}\n"
+            f"\u8acb\u554f\u4ee5\u4e0a\u8cc7\u6599\u662f\u5426\u6b63\u78ba\uff1f\u6b63\u78ba\u8acb\u56de\u8986 1"
+        )))
         return
 
     if user_text == "1" and user_id in temp_users:
         data = temp_users[user_id]
         now = datetime.now(tz)
         existing_record = Whitelist.query.filter_by(phone=data["phone"]).first()
-
         if existing_record:
             existing_record.line_user_id = user_id
             existing_record.line_id = data["line_id"]
@@ -182,14 +225,17 @@ def handle_message(event):
             created_time = now.strftime('%Y/%m/%d %H:%M:%S')
 
         reply = (
-            f"📱 {data['phone']}\n"
-            f"🌸 暱稱：{data['name']}\n"
-            f"       個人編號：{saved_id}\n"
-            f"🔗 LINE ID：{data['line_id']}\n"
-            f"🕒 {created_time}\n"
-            f"✅ 驗證成功，歡迎加入茗殿"
+            f"\ud83d\udcf1 {data['phone']}\n"
+            f"\ud83c\udf38 \u66c9\u540d\uff1a{data['name']}\n"
+            f"       \u500b\u4eba\u7de8\u865f\uff1a{saved_id}\n"
+            f"\ud83d\udd17 LINE ID\uff1a{data['line_id']}\n"
+            f"\ud83d\udd52 {created_time}\n"
+            f"\u2705 \u9a57\u8b49\u6210\u529f\uff0c\u6b61\u8fce\u52a0\u5165\u83ef\u6bbf"
         )
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
+        line_bot_api.reply_message(event.reply_token, [
+            TextSendMessage(text=reply),
+            get_function_menu_flex()
+        ])
         temp_users.pop(user_id)
         return
 
