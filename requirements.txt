@@ -2,8 +2,8 @@ Flask
 gunicorn
 flask_sqlalchemy
 line-bot-sdk==2.4.1
+gspread
+oauth2client
 python-dotenv
-pytz
-pytesseract
-Pillow
 psycopg2-binary
+pytz
