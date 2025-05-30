@@ -35,6 +35,7 @@ def save_coupon_record(user_id, amount, CouponModel, db):
 def get_today_coupon_flex(user_id, display_name, amount):
     now = datetime.now(timezone("Asia/Taipei"))
     today_str = now.strftime("%Y/%m/%d")
+    emoji_date = f"📅 {now.strftime('%m/%d')}"
     expire_time = "23:59"
 
     if amount == 0:
@@ -54,12 +55,41 @@ def get_today_coupon_flex(user_id, display_name, amount):
                 "layout": "vertical",
                 "spacing": "md",
                 "contents": [
-                    {"type": "text", "text": "📅 每日抽獎結果", "weight": "bold", "size": "lg"},
-                    {"type": "text", "text": f"用戶：{display_name}", "size": "sm", "color": "#888888"},
-                    {"type": "text", "text": f"日期：{today_str}", "size": "sm", "color": "#888888"},
+                    {
+                        "type": "text",
+                        "text": emoji_date,
+                        "weight": "bold",
+                        "size": "lg"
+                    },
+                    {
+                        "type": "text",
+                        "text": f"用戶：{display_name}",
+                        "size": "sm",
+                        "color": "#888888"
+                    },
+                    {
+                        "type": "text",
+                        "text": f"日期：{today_str}",
+                        "size": "sm",
+                        "color": "#888888"
+                    },
                     {"type": "separator"},
-                    {"type": "text", "text": text, "size": "xl", "weight": "bold", "color": color, "align": "center", "margin": "md"},
-                    {"type": "text", "text": f"🕒 有效至：今日 {expire_time}", "size": "sm", "color": "#999999", "align": "center"}
+                    {
+                        "type": "text",
+                        "text": text,
+                        "size": "xl",
+                        "weight": "bold",
+                        "color": color,
+                        "align": "center",
+                        "margin": "md"
+                    },
+                    {
+                        "type": "text",
+                        "text": f"🕒 有效至：今日 {expire_time}",
+                        "size": "sm",
+                        "color": "#999999",
+                        "align": "center"
+                    }
                 ]
             }
         }
