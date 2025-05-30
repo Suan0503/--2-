@@ -1,8 +1,7 @@
-
 from flask import Flask, request, abort
 from flask_sqlalchemy import SQLAlchemy
 from linebot import LineBotApi, WebhookHandler
-from linebot.models import MessageEvent, TextMessage, TextSendMessage, FollowEvent, ImageMessage, TemplateSendMessage, ButtonsTemplate, PostbackAction
+from linebot.models import MessageEvent, TextMessage, TextSendMessage, FollowEvent
 from linebot.exceptions import InvalidSignatureError
 from datetime import datetime
 from dotenv import load_dotenv
@@ -10,11 +9,8 @@ import os
 import re
 import traceback
 import pytz
-import tempfile
-import pytesseract
-from PIL import Image
 
-pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
+print("\U0001F7E2 進入 main.py 開始啟動 Flask")
 
 load_dotenv()
 
@@ -23,8 +19,10 @@ app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
 
-line_bot_api = LineBotApi(os.getenv("LINE_CHANNEL_ACCESS_TOKEN"))
-handler = WebhookHandler(os.getenv("LINE_CHANNEL_SECRET"))
+LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
+LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET")
+line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
+handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
 temp_users = {}
 
@@ -39,7 +37,7 @@ class Whitelist(db.Model):
 
 @app.route("/")
 def home():
-    return "LINE Bot 正常運作中～🍵"
+    return "LINE Bot 正常運作中～\U0001F375"
 
 @app.route("/callback", methods=["POST"])
 def callback():
@@ -50,93 +48,81 @@ def callback():
     except InvalidSignatureError:
         abort(400)
     except Exception as e:
+        print("❗ callback 發生例外：", e)
         traceback.print_exc()
         abort(500)
     return "OK"
 
 @handler.add(FollowEvent)
 def handle_follow(event):
-    msg = "請輸入手機號碼開始驗證（例如：0912345678）📱"
+    msg = (
+        "歡迎加入\U0001F375茗殿\U0001F375\n"
+        "請正確按照步驟提供資料配合快速驗證\n\n"
+        "➡️ 請輸入手機號碼進行驗證（含09開頭）"
+    )
     line_bot_api.reply_message(event.reply_token, TextSendMessage(text=msg))
 
 @handler.add(MessageEvent, message=TextMessage)
 def handle_text(event):
     user_id = event.source.user_id
-    msg = event.message.text.strip()
-    profile = line_bot_api.get_profile(user_id)
+    user_text = event.message.text.strip()
+
     tz = pytz.timezone("Asia/Taipei")
-    now = datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S")
+    now = datetime.now(tz)
+    profile = line_bot_api.get_profile(user_id)
+    display_name = profile.display_name
 
     existing = Whitelist.query.filter_by(line_user_id=user_id).first()
     if existing:
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text="✅ 已完成驗證"))
+        if user_text == existing.phone:
+            reply = (
+                f"\U0001F4F1 {existing.phone}\n"
+                f"\U0001F338 暱稱：{existing.name or display_name}\n"
+                f"       個人編號：{existing.id}\n"
+                f"\U0001F517 LINE ID：{existing.line_id or '無資料'}\n"
+                f"⏰ 驗證時間：{existing.created_at.astimezone(tz).strftime('%Y-%m-%d %H:%M:%S')}"
+            )
+        else:
+            reply = "✅ 你已完成驗證，不需再次輸入。"
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
         return
 
-    if re.match(r"^09\d{8}$", msg):
-        temp_users[user_id] = {"phone": msg, "name": profile.display_name, "line_id": "", "time": now}
+    if re.match(r"^09\d{8}$", user_text):
+        temp_users[user_id] = {"phone": user_text, "name": display_name, "line_id": ""}
         reply = "請輸入您的 LINE ID（不含@）"
+
     elif user_id in temp_users and not temp_users[user_id]["line_id"]:
-        temp_users[user_id]["line_id"] = msg
-        reply = "請上傳 LINE 截圖顯示手機與 LINE ID"
-    elif msg == "1" and user_id in temp_users:
+        temp_users[user_id]["line_id"] = user_text
         data = temp_users[user_id]
-        new = Whitelist(phone=data["phone"], name=data["name"], line_id=data["line_id"], date=now, line_user_id=user_id)
+        reply = (
+            f"\U0001F4F1 {data['phone']}\n"
+            f"\U0001F338 暱稱：{data['name']}\n"
+            f"       個人編號：待驗證後產生\n"
+            f"\U0001F517 LINE ID：{data['line_id']}\n"
+            f"請確認資料正確，若正確請回覆 1 完成驗證"
+        )
+
+    elif user_text == "1" and user_id in temp_users:
+        data = temp_users[user_id]
+        new = Whitelist(
+            phone=data["phone"], name=data["name"], line_id=data["line_id"],
+            date=now.strftime("%Y-%m-%d"), line_user_id=user_id, created_at=now
+        )
         db.session.add(new)
         db.session.commit()
-        del temp_users[user_id]
-        template = TemplateSendMessage(
-            alt_text='驗證完成選單',
-            template=ButtonsTemplate(
-                title='✅ 驗證成功',
-                text='請選擇您要進行的操作',
-                actions=[
-                    PostbackAction(label='驗證資訊', data='info'),
-                    PostbackAction(label='每日班表', data='schedule'),
-                    PostbackAction(label='新品上架', data='new'),
-                    PostbackAction(label='預約諮詢', data='booking')
-                ]
-            )
+        reply = (
+            f"\U0001F4F1 {data['phone']}\n"
+            f"\U0001F338 暱稱：{data['name']}\n"
+            f"       個人編號：{new.id}\n"
+            f"\U0001F517 LINE ID：{data['line_id']}\n"
+            f"⏰ 驗證時間：{now.strftime('%Y-%m-%d %H:%M:%S')}\n"
+            f"✅ 驗證成功，歡迎加入茗殿～"
         )
-        line_bot_api.reply_message(event.reply_token, template)
-        return
+        temp_users.pop(user_id, None)
     else:
-        reply = "請先輸入手機號碼（例如：0912345678）"
+        reply = "請先輸入手機號碼（09開頭）來開始驗證流程～"
 
     line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
 
-@handler.add(MessageEvent, message=ImageMessage)
-def handle_image(event):
-    user_id = event.source.user_id
-    if user_id not in temp_users:
-        return
-
-    message_content = line_bot_api.get_message_content(event.message.id)
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as tf:
-        for chunk in message_content.iter_content():
-            tf.write(chunk)
-        temp_path = tf.name
-
-    try:
-        img = Image.open(temp_path)
-        ocr_text = pytesseract.image_to_string(img, lang="eng+chi_tra")
-        print("[OCR]", ocr_text)
-    except Exception as e:
-        print("[OCR Failed]", e)
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text="⚠️ 圖片辨識失敗，請重新上傳清晰圖片"))
-        return
-
-    phone_match = re.search(r"09\d{8}", ocr_text)
-    line_id_match = re.search(r"ID[:：\s]*([a-zA-Z0-9_\-]+)", ocr_text)
-    record = temp_users[user_id]
-
-    if phone_match and line_id_match:
-        phone_ok = phone_match.group() == record['phone']
-        line_id_ok = line_id_match.group(1) == record['line_id']
-        if phone_ok and line_id_ok:
-            msg = "✅ 圖片驗證成功，請回覆 1 完成登記"
-        else:
-            msg = "⚠️ 圖片資訊與您輸入的不符，請重新確認"
-    else:
-        msg = "⚠️ 無法辨識手機與 ID，請重新拍攝並上傳"
-
-    line_bot_api.reply_message(event.reply_token, TextSendMessage(text=msg))
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))
