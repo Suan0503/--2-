@@ -1,17 +1,14 @@
 FROM python:3.11-slim
 
-# 安裝依賴
-RUN apt-get update && apt-get install -y gcc build-essential libffi-dev
+RUN apt-get update && apt-get install -y \
+    tesseract-ocr \
+    tesseract-ocr-chi-tra \
+    libsm6 libxext6 libxrender-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-# 建立工作資料夾
 WORKDIR /app
 
-# 安裝套件
-COPY requirements.txt .
-RUN pip install --upgrade pip && pip install -r requirements.txt
+COPY . /app
+RUN pip install --no-cache-dir -r requirements.txt
 
-# 複製所有檔案
-COPY . .
-
-# 執行程式
-CMD ["python", "main.py"]
+CMD exec gunicorn --bind :8000 --timeout 60 main:app
