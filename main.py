@@ -224,7 +224,7 @@ def handle_message(event):
                 TextSendMessage(text="⚠️ 此手機號碼已被使用，請輸入正確的手機號碼")
             )
             return
-        temp_users[user_id] = {"phone": user_text, "name": display_name}
+        temp_users[user_id] = {"phone": user_text, "name": display_name, "step": "waiting_lineid"}
         line_bot_api.reply_message(
             event.reply_token,
             [
@@ -234,23 +234,26 @@ def handle_message(event):
         )
         return
 
-    if user_id in temp_users and len(user_text) >= 4:
+    # 步驟二：輸入 LINE ID
+    if user_id in temp_users and temp_users[user_id].get("step", "waiting_lineid") == "waiting_lineid" and len(user_text) >= 4:
         record = temp_users[user_id]
         record["line_id"] = user_text
+        record["step"] = "waiting_screenshot"
         temp_users[user_id] = record
 
-        reply = (
-            f"📱 {record['phone']}\n"
-            f"🌸 暱稱：{record['name']}\n"
-            f"       個人編號：待驗證後產生\n"
-            f"🔗 LINE ID：{record['line_id']}\n"
-            f"請問以上資料是否正確？正確請回復 1\n"
-            f"⚠️輸入錯誤請從新輸入手機號碼即可⚠️"
+        line_bot_api.reply_message(
+            event.reply_token,
+            TextSendMessage(
+                text=(
+                    "請上傳您的 LINE 個人頁面截圖（需清楚顯示手機號與 LINE ID）以供驗證。\n"
+                    "📸 操作教學：LINE主頁 > 右上角設定 > 個人檔案（點進去之後截圖）"
+                )
+            )
         )
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
         return
 
-    if user_text == "1" and user_id in temp_users:
+    # 步驟四：用戶確認
+    if user_text == "1" and user_id in temp_users and temp_users[user_id].get("step") == "waiting_confirm":
         data = temp_users[user_id]
         now = datetime.now(tz)
         existing_record = Whitelist.query.filter_by(phone=data["phone"]).first()
@@ -287,6 +290,45 @@ def handle_message(event):
         line_bot_api.reply_message(event.reply_token, [TextSendMessage(text=reply), get_function_menu_flex()])
         temp_users.pop(user_id)
         return
+
+# 處理 LINE 截圖上傳並 OCR 驗證
+@handler.add(MessageEvent, message=ImageMessage)
+def handle_image(event):
+    user_id = event.source.user_id
+    if user_id not in temp_users or temp_users[user_id].get("step") != "waiting_screenshot":
+        return  # 非驗證流程不處理
+
+    # 下載圖片
+    message_content = line_bot_api.get_message_content(event.message.id)
+    image_path = f"/tmp/{user_id}_line_profile.png"
+    with open(image_path, 'wb') as fd:
+        for chunk in message_content.iter_content():
+            fd.write(chunk)
+
+    # OCR 驗證
+    phone_ocr, lineid_ocr, ocr_text = extract_lineid_phone(image_path)
+    input_phone = temp_users[user_id].get("phone")
+    input_lineid = temp_users[user_id].get("line_id")
+
+    # 比對 OCR 結果
+    if phone_ocr == input_phone and lineid_ocr == input_lineid:
+        record = temp_users[user_id]
+        reply = (
+            f"📱 {record['phone']}\n"
+            f"🌸 暱稱：{record['name']}\n"
+            f"       個人編號：待驗證後產生\n"
+            f"🔗 LINE ID：{record['line_id']}\n"
+            f"請問以上資料是否正確？正確請回復 1\n"
+            f"⚠️輸入錯誤請從新輸入手機號碼即可⚠️"
+        )
+        record["step"] = "waiting_confirm"
+        temp_users[user_id] = record
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
+    else:
+        line_bot_api.reply_message(
+            event.reply_token,
+            TextSendMessage(text="❌ 截圖中的手機號碼或 LINE ID 與您輸入的不符，請重新上傳正確的 LINE 個人頁面截圖。")
+        )
 
 @app.route("/ocr", methods=["POST"])
 def ocr_image_verification():
