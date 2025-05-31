@@ -1,4 +1,4 @@
-from flask import Flask, request, abort
+from flask import Flask, request, abort, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from linebot import LineBotApi, WebhookHandler
 from linebot.models import MessageEvent, TextMessage, TextSendMessage, FlexSendMessage, FollowEvent
@@ -10,6 +10,9 @@ import re
 import traceback
 import pytz
 from draw_utils import draw_coupon, get_today_coupon_flex, has_drawn_today, save_coupon_record
+
+# 新增 OCR 模組
+from image_verification import extract_lineid_phone
 
 load_dotenv()
 
@@ -255,6 +258,28 @@ def handle_message(event):
         line_bot_api.reply_message(event.reply_token, [TextSendMessage(text=reply), get_function_menu_flex()])
         temp_users.pop(user_id)
         return
+
+# ----------- 新增：OCR 圖片驗證 API -----------
+@app.route("/ocr", methods=["POST"])
+def ocr_image_verification():
+    """
+    前端需用 multipart/form-data 上傳圖片
+    回傳辨識到的手機與 LINE ID
+    """
+    # 圖片欄位名為 'image'
+    if "image" not in request.files:
+        return jsonify({"error": "請上傳圖片（欄位名稱 image）"}), 400
+    file = request.files["image"]
+    file_path = "temp_ocr_img.png"
+    file.save(file_path)
+    phone, line_id, text = extract_lineid_phone(file_path)
+    os.remove(file_path)
+    return jsonify({
+        "phone": phone,
+        "line_id": line_id,
+        "ocr_text": text
+    })
+# ----------- 新增結束 -----------
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
