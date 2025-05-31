@@ -5,3 +5,5 @@ line-bot-sdk==2.4.1
 python-dotenv
 pytz
 psycopg2-binary
+pillow
+pytesseract
