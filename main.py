@@ -1,7 +1,9 @@
 from flask import Flask, request, abort, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from linebot import LineBotApi, WebhookHandler
-from linebot.models import MessageEvent, TextMessage, TextSendMessage, FlexSendMessage, FollowEvent
+from linebot.models import (
+    MessageEvent, TextMessage, TextSendMessage, FlexSendMessage, FollowEvent, ImageMessage
+)
 from linebot.exceptions import InvalidSignatureError
 from datetime import datetime
 from dotenv import load_dotenv
@@ -11,7 +13,7 @@ import traceback
 import pytz
 from draw_utils import draw_coupon, get_today_coupon_flex, has_drawn_today, save_coupon_record
 
-# 新增 OCR 模組
+# OCR 模組
 from image_verification import extract_lineid_phone
 
 load_dotenv()
@@ -91,7 +93,6 @@ def get_function_menu_flex():
     )
 
 def choose_link():
-    import hashlib
     group = [
         "https://line.me/ti/p/g7TPO_lhAL",
         "https://line.me/ti/p/Q6-jrvhXbH",
@@ -134,7 +135,7 @@ def handle_message(event):
     profile = line_bot_api.get_profile(user_id)
     display_name = profile.display_name
 
-    # ----------- 新增：處理「驗證資訊」訊息 -----------
+    # 查詢驗證資訊
     if user_text == "驗證資訊":
         existing = Whitelist.query.filter_by(line_user_id=user_id).first()
         if existing:
@@ -150,8 +151,8 @@ def handle_message(event):
         else:
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="⚠️ 你尚未完成驗證，請輸入手機號碼進行驗證。"))
         return
-    # ----------- 新增結束 -----------
 
+    # 每日抽獎
     if user_text == "每日抽獎":
         today_str = datetime.now(tz).strftime("%Y-%m-%d")
         if has_drawn_today(user_id, Coupon):
@@ -159,13 +160,13 @@ def handle_message(event):
             flex = get_today_coupon_flex(user_id, display_name, coupon.amount)
             line_bot_api.reply_message(event.reply_token, flex)
             return
-
         amount = draw_coupon()
         save_coupon_record(user_id, amount, Coupon, db)
         flex = get_today_coupon_flex(user_id, display_name, amount)
         line_bot_api.reply_message(event.reply_token, flex)
         return
 
+    # 已驗證過
     existing = Whitelist.query.filter_by(line_user_id=user_id).first()
     if existing:
         if user_text == existing.phone:
@@ -182,11 +183,11 @@ def handle_message(event):
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="⚠️ 你已驗證完成，請輸入手機號碼查看驗證資訊"))
         return
 
+    # 步驟一：輸入手機號
     if re.match(r"^09\d{8}$", user_text):
         black = Blacklist.query.filter_by(phone=user_text).first()
         if black:
             return
-
         repeated = Whitelist.query.filter_by(phone=user_text).first()
         if repeated and repeated.line_user_id:
             line_bot_api.reply_message(
@@ -194,8 +195,7 @@ def handle_message(event):
                 TextSendMessage(text="⚠️ 此手機號碼已被使用，請輸入正確的手機號碼")
             )
             return
-
-        temp_users[user_id] = {"phone": user_text, "name": display_name}
+        temp_users[user_id] = {"phone": user_text, "name": display_name, "step": "waiting_lineid"}
         line_bot_api.reply_message(
             event.reply_token,
             [
@@ -205,27 +205,23 @@ def handle_message(event):
         )
         return
 
-    if user_id in temp_users and len(user_text) >= 4:
+    # 步驟二：輸入 LINE ID
+    if user_id in temp_users and temp_users[user_id].get("step") == "waiting_lineid" and len(user_text) >= 4:
         record = temp_users[user_id]
         record["line_id"] = user_text
+        record["step"] = "waiting_screenshot"
         temp_users[user_id] = record
-
-        reply = (
-            f"📱 {record['phone']}\n"
-            f"🌸 暱稱：{record['name']}\n"
-            f"       個人編號：待驗證後產生\n"
-            f"🔗 LINE ID：{record['line_id']}\n"
-            f"請問以上資料是否正確？正確請回復 1\n"
-            f"⚠️輸入錯誤請從新輸入手機號碼即可⚠️"
+        line_bot_api.reply_message(
+            event.reply_token,
+            TextSendMessage(text="請上傳您的 LINE 個人頁面截圖（需清楚顯示手機號與 LINE ID）以供驗證。")
         )
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
         return
 
-    if user_text == "1" and user_id in temp_users:
+    # 步驟四：用戶確認
+    if user_text == "1" and user_id in temp_users and temp_users[user_id].get("step") == "waiting_confirm":
         data = temp_users[user_id]
         now = datetime.now(tz)
         existing_record = Whitelist.query.filter_by(phone=data["phone"]).first()
-
         if existing_record:
             existing_record.line_user_id = user_id
             existing_record.line_id = data["line_id"]
@@ -259,14 +255,47 @@ def handle_message(event):
         temp_users.pop(user_id)
         return
 
-# ----------- 新增：OCR 圖片驗證 API -----------
+# 步驟三：處理 LINE 截圖上傳並 OCR 驗證
+@handler.add(MessageEvent, message=ImageMessage)
+def handle_image(event):
+    user_id = event.source.user_id
+    if user_id not in temp_users or temp_users[user_id].get("step") != "waiting_screenshot":
+        return  # 非驗證流程不處理
+
+    # 下載圖片
+    message_content = line_bot_api.get_message_content(event.message.id)
+    image_path = f"/tmp/{user_id}_line_profile.png"
+    with open(image_path, 'wb') as fd:
+        for chunk in message_content.iter_content():
+            fd.write(chunk)
+
+    # OCR 驗證
+    phone_ocr, lineid_ocr, ocr_text = extract_lineid_phone(image_path)
+    input_phone = temp_users[user_id].get("phone")
+    input_lineid = temp_users[user_id].get("line_id")
+
+    # 比對 OCR 結果
+    if phone_ocr == input_phone and lineid_ocr == input_lineid:
+        record = temp_users[user_id]
+        reply = (
+            f"📱 {record['phone']}\n"
+            f"🌸 暱稱：{record['name']}\n"
+            f"       個人編號：待驗證後產生\n"
+            f"🔗 LINE ID：{record['line_id']}\n"
+            f"請問以上資料是否正確？正確請回復 1\n"
+            f"⚠️輸入錯誤請從新輸入手機號碼即可⚠️"
+        )
+        record["step"] = "waiting_confirm"
+        temp_users[user_id] = record
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
+    else:
+        line_bot_api.reply_message(
+            event.reply_token,
+            TextSendMessage(text="❌ 截圖中的手機號碼或 LINE ID 與您輸入的不符，請重新上傳正確的 LINE 個人頁面截圖。")
+        )
+
 @app.route("/ocr", methods=["POST"])
 def ocr_image_verification():
-    """
-    前端需用 multipart/form-data 上傳圖片
-    回傳辨識到的手機與 LINE ID
-    """
-    # 圖片欄位名為 'image'
     if "image" not in request.files:
         return jsonify({"error": "請上傳圖片（欄位名稱 image）"}), 400
     file = request.files["image"]
@@ -279,7 +308,6 @@ def ocr_image_verification():
         "line_id": line_id,
         "ocr_text": text
     })
-# ----------- 新增結束 -----------
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
