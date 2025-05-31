@@ -70,14 +70,14 @@ def get_function_menu_flex():
                         "contents": [
                             {"type": "button", "action": {"type": "message", "label": "📱 驗證資訊", "text": "驗證資訊"}, "style": "primary", "color": "#00C37E"},
                             {
-  "type": "button",
-  "action": {
-    "type": "uri",
-    "label": "📅 每日班表",
-    "uri": "https://t.me/+XgwLCJ6kdhhhZDE1"
-  },
-  "style": "link"
-},
+                                "type": "button",
+                                "action": {
+                                    "type": "uri",
+                                    "label": "📅 每日班表",
+                                    "uri": "https://t.me/+XgwLCJ6kdhhhZDE1"
+                                },
+                                "style": "link"
+                            },
                             {"type": "button", "action": {"type": "message", "label": "🎁 每日抽獎", "text": "每日抽獎"}, "style": "primary", "color": "#FF9900"},
                             {"type": "button", "action": {"type": "uri", "label": "📬 預約諮詢", "uri": choose_link()}, "style": "primary", "color": "#B889F2"}
                         ]
@@ -130,6 +130,24 @@ def handle_message(event):
     tz = pytz.timezone("Asia/Taipei")
     profile = line_bot_api.get_profile(user_id)
     display_name = profile.display_name
+
+    # ----------- 新增：處理「驗證資訊」訊息 -----------
+    if user_text == "驗證資訊":
+        existing = Whitelist.query.filter_by(line_user_id=user_id).first()
+        if existing:
+            reply = (
+                f"📱 {existing.phone}\n"
+                f"🌸 暱稱：{existing.name or display_name}\n"
+                f"       個人編號：{existing.id}\n"
+                f"🔗 LINE ID：{existing.line_id or '未登記'}\n"
+                f"🕒 {existing.created_at.astimezone(tz).strftime('%Y/%m/%d %H:%M:%S')}\n"
+                f"✅ 驗證成功，歡迎加入茗殿"
+            )
+            line_bot_api.reply_message(event.reply_token, [TextSendMessage(text=reply), get_function_menu_flex()])
+        else:
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="⚠️ 你尚未完成驗證，請輸入手機號碼進行驗證。"))
+        return
+    # ----------- 新增結束 -----------
 
     if user_text == "每日抽獎":
         today_str = datetime.now(tz).strftime("%Y-%m-%d")
