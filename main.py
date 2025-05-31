@@ -179,7 +179,7 @@ def handle_message(event):
             event.reply_token,
             [
                 TextSendMessage(text="📱 手機已登記囉～請接著輸入您的 LINE ID"),
-                TextSendMessage(text="（如無 ID 請輸入：無ID）\n若手機就是 ID，請輸入：09XXXXXXXX")
+                TextSendMessage(text="（如無 ID 請輸入：無ID）\n若手機就是 ID，請開頭輸入ID兩字（ID09XXXXXXXX）")
             ]
         )
         return
@@ -195,6 +195,7 @@ def handle_message(event):
             f"       個人編號：待驗證後產生\n"
             f"🔗 LINE ID：{record['line_id']}\n"
             f"請問以上資料是否正確？正確請回復 1"
+            f"⚠️輸入錯誤請從新輸入手機號碼即可⚠️"
         )
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
         return
