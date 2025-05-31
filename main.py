@@ -168,11 +168,20 @@ def handle_message(event):
 
         repeated = Whitelist.query.filter_by(phone=user_text).first()
         if repeated and repeated.line_user_id:
-            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="⚠️ 此手機號碼已被使用，請輸入正確的手機號碼"))
+            line_bot_api.reply_message(
+                event.reply_token,
+                TextSendMessage(text="⚠️ 此手機號碼已被使用，請輸入正確的手機號碼")
+            )
             return
 
         temp_users[user_id] = {"phone": user_text, "name": display_name}
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text="📱 手機已登記，請接著輸入您的 LINE ID～"))
+        line_bot_api.reply_message(
+            event.reply_token,
+            [
+                TextSendMessage(text="📱 手機已登記囉～請接著輸入您的 LINE ID"),
+                TextSendMessage(text="（如無 ID 請輸入：無ID）\n若手機就是 ID，請輸入：09XXXXXXXX")
+            ]
+        )
         return
 
     if user_id in temp_users and len(user_text) >= 4:
