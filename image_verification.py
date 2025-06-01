@@ -17,6 +17,7 @@ def normalize_text(text):
     return re.sub(r'[\W_]+', '', text)
 
 def normalize_phone(phone):
+    phone = phone.replace('O', '0').replace('o', '0')
     phone = re.sub(r'\D', '', phone)
     if phone.startswith('8869') and len(phone) == 12:
         phone = '09' + phone[4:]
@@ -41,6 +42,23 @@ def is_fake_line_id(lineid):
 
 def similar_id(id1, id2):
     return normalize_text(id1).lower() == normalize_text(id2).lower()
+
+def generate_lineid_candidates(lineid):
+    """
+    根據 L/1 混用產生所有可能的 LINE ID 選項，去重。
+    只針對有 L/1 的情境，避免無意義變體。
+    """
+    candidates = set()
+    candidates.add(lineid)
+    # L -> 1
+    if 'L' in lineid or 'l' in lineid:
+        candidates.add(lineid.replace('L', '1').replace('l', '1'))
+    # 1 -> L
+    if '1' in lineid:
+        candidates.add(lineid.replace('1', 'L'))
+        candidates.add(lineid.replace('1', 'l'))
+    # 你也可根據 O/0 等需求擴充
+    return list(candidates)
 
 def extract_lineid_phone(image_path, debug=False):
     image = preprocess_image(image_path)
@@ -82,9 +100,38 @@ def extract_lineid_phone(image_path, debug=False):
             if candidate and not is_fake_line_id(candidate):
                 line_id = candidate
 
+    # 產生候選清單
+    line_id_candidates = []
+    if line_id:
+        line_id_candidates = generate_lineid_candidates(line_id)
+        line_id_candidates = [c for c in line_id_candidates if not is_fake_line_id(c)]
+        line_id_candidates = list(set(line_id_candidates))
+
     if debug:
         print("OCR全文：", text)
         print("image_to_data：", words)
-        print("抓到ID：", line_id)
+        print("抓到ID候選：", line_id_candidates)
 
-    return phone, line_id, text, similar_id
+    # 回傳時
+    if len(line_id_candidates) > 1:
+        return phone, line_id_candidates, text, similar_id
+    elif len(line_id_candidates) == 1:
+        return phone, line_id_candidates[0], text, similar_id
+    else:
+        return phone, None, text, similar_id
+
+# --- CLI互動範例 ---
+if __name__ == "__main__":
+    img_path = input("請輸入圖片路徑：")
+    phone, lineid_result, text, similar_id = extract_lineid_phone(img_path, debug=True)
+    print(f"【圖片偵測結果】\n手機:{phone}")
+    # 如果有多個候選，讓用戶選擇
+    if isinstance(lineid_result, list):
+        print("請選擇正確的 LINE ID：")
+        for idx, lid in enumerate(lineid_result, 1):
+            print(f"{idx}. {lid}")
+        user_input = input("請輸入編號選擇：")
+        selected_line_id = lineid_result[int(user_input)-1]
+        print(f"你選擇的 LINE ID 是: {selected_line_id}")
+    else:
+        print(f"LINE ID: {lineid_result}")
