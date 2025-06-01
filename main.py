@@ -13,10 +13,7 @@ import traceback
 import pytz
 from draw_utils import draw_coupon, get_today_coupon_flex, has_drawn_today, save_coupon_record
 
-# OCR 模組
-from image_verification import extract_lineid_phone, normalize_text
-
-# 手動通過名單模組
+from image_verification import extract_lineid_phone, normalize_text, similar_id
 from special_case import is_special_case, add_special_case
 
 load_dotenv()
@@ -215,24 +212,25 @@ def handle_message(event):
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="⚠️ 你已驗證完成，請輸入手機號碼查看驗證資訊"))
         return
 
-    # 用戶回覆多選 LINE ID 的情境
+    # 重要：用戶選擇 LINE ID 的情境，直接進入確認
     if user_id in temp_users and temp_users[user_id].get("step") == "waiting_lineid_choice":
         try:
             idx = int(user_text.strip()) - 1
             lineid_candidates = temp_users[user_id]["lineid_candidates"]
             chosen = lineid_candidates[idx]
             temp_users[user_id]["line_id"] = chosen
-            temp_users[user_id]["step"] = "waiting_screenshot"
-            del temp_users[user_id]["lineid_candidates"]
-            line_bot_api.reply_message(
-                event.reply_token,
-                TextSendMessage(
-                    text=(
-                        f"你選擇的 LINE ID 為：{chosen}\n"
-                        "請上傳您的 LINE 個人頁面截圖（需清楚顯示手機號與 LINE ID）以供驗證。"
-                    )
-                )
+            record = temp_users[user_id]
+            reply = (
+                f"📱 {record['phone']}\n"
+                f"🌸 暱稱：{record['name']}\n"
+                f"       個人編號：待驗證後產生\n"
+                f"🔗 LINE ID：{chosen}\n"
+                f"請問以上資料是否正確？正確請回復 1\n"
+                f"⚠️輸入錯誤請從新輸入手機號碼即可⚠️"
             )
+            temp_users[user_id]["step"] = "waiting_confirm"
+            del temp_users[user_id]["lineid_candidates"]
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
         except Exception:
             line_bot_api.reply_message(
                 event.reply_token,
@@ -359,7 +357,7 @@ def handle_image(event):
     input_lineid = temp_users[user_id].get("line_id")
     record = temp_users[user_id]
 
-    # 1. 多候選 LINE ID 處理
+    # 多候選 LINE ID：進入多選流程
     if isinstance(lineid_ocr, list) and len(lineid_ocr) > 1:
         temp_users[user_id]["lineid_candidates"] = lineid_ocr
         temp_users[user_id]["step"] = "waiting_lineid_choice"
