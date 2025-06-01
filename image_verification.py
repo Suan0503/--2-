@@ -1,22 +1,37 @@
-image = image.convert('L')Add commentMore actions
+import re
+import pytesseract
+from PIL import Image, ImageOps, ImageEnhance
+
+def preprocess_image(image_path):
+    image = Image.open(image_path)
+    image = image.convert('L')
     # 檢查是否為白底（亮像素明顯多）
     hist = image.histogram()
     if sum(hist[200:]) > sum(hist[:55]):  # 白色像素大於黑色像素
-    if sum(hist[200:]) > sum(hist[:55]):
         image = ImageOps.invert(image)
     # 增強對比
     enhancer = ImageEnhance.Contrast(image)
     image = enhancer.enhance(2)
     # 二值化，針對白底建議閾值再低一點如120
-    # 二值化
     image = image.point(lambda x: 0 if x < 120 else 255, '1')
     return image
 
-@@ -37,17 +37,51 @@ def normalize_text(text):
+def normalize_text(text):
     text = re.sub(r'[\W_]+', '', text)
     return text
 
-def extract_lineid_phone(image_path):
+def normalize_phone(phone):
+    phone = re.sub(r'\D', '', phone)
+    if phone.startswith('886') and len(phone) == 11:
+        phone = '09' + phone[3:]
+    elif phone.startswith('+886') and len(phone) == 12:
+        phone = '09' + phone[4:]
+    return phone
+
+def similar_id(id1, id2):
+    """簡單模糊比對（可再強化）"""
+    return normalize_text(id1).lower() == normalize_text(id2).lower()
+
 def extract_lineid_phone(image_path, debug=False):
     image = preprocess_image(image_path)
     text = pytesseract.image_to_string(image, lang='eng+chi_tra')
@@ -54,7 +69,7 @@ def extract_lineid_phone(image_path, debug=False):
                 # 若遇到多語系「複製」關鍵字則截斷
                 candidate = re.split(r'(複製|コピー|Copy)', candidate)[0].strip()
                 if candidate:
-                    line_id = candidateAdd commentMore actions
+                    line_id = candidate
                     break
 
     # fallback: 單行正則（遇到有些截圖ID沒被拆開）
@@ -68,4 +83,5 @@ def extract_lineid_phone(image_path, debug=False):
         print("image_to_data：", words)
         print("抓到ID：", line_id)
 
-    return phone, line_id, text
+    # 新版需求：回傳4個參數，最後一個是similar_id function
+    return phone, line_id, text, similar_id
