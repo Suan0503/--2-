@@ -5,16 +5,12 @@ import pytesseract
 
 def preprocess_image(image_path):
     image = Image.open(image_path)
-    # 灰階
     image = image.convert('L')
-    # 檢查是否為白底（亮像素明顯多）
     hist = image.histogram()
     if sum(hist[200:]) > sum(hist[:55]):
         image = ImageOps.invert(image)
-    # 增強對比
     enhancer = ImageEnhance.Contrast(image)
     image = enhancer.enhance(2)
-    # 二值化
     image = image.point(lambda x: 0 if x < 120 else 255, '1')
     return image
 
@@ -69,12 +65,11 @@ def extract_lineid_phone(image_path, debug=False):
     if phone_match:
         phone = normalize_phone(phone_match.group(0))
 
-    # 進階：用 image_to_data 合併多框（解決ID被截斷問題）
+    # 用 image_to_data 合併多框，解決ID被截斷
     data = pytesseract.image_to_data(image, lang='eng+chi_tra', output_type=pytesseract.Output.DICT)
     words = data['text']
     line_id = None
 
-    # 找到 "ID" 關鍵字，合併其後 1~3 個 box
     for i, word in enumerate(words):
         if isinstance(word, str) and word and re.match(r'^ID$', word, re.IGNORECASE):
             next_words = []
