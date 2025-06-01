@@ -378,7 +378,7 @@ def handle_image(event):
                 event.reply_token,
                 TextSendMessage(
                     text=f"❌ 截圖中的手機號碼或 LINE ID 與您輸入的不符，請重新上傳正確的 LINE 個人頁面截圖。\n"
-                         f"【OCR結果】手機:{phone_ocr or '未識別'}\nLINE ID:{lineid_ocr or '未識別'}"
+                         f"【圖片偵測結果】手機:{phone_ocr or '未識別'}\nLINE ID:{lineid_ocr or '未識別'}"
                 )
             )
 
