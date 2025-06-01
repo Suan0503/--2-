@@ -30,14 +30,10 @@ def normalize_phone(phone):
 def normalize_text(text):
     if not text:
         return ""
-    text = text.lower()
-    text = re.sub(r'[\W_]+', '', text)
+    text = re.sub(r'[\W_]+', '', text.lower())
     return text
 
 def similar_id(id1, id2):
-    """
-    判斷兩個 LINE ID 是否相似，允許常見 OCR 混淆字元，編輯距離容忍度 0.85
-    """
     if not id1 or not id2:
         return False
     id1 = id1.lower()
@@ -53,49 +49,49 @@ def similar_id(id1, id2):
     for a, b in swaps:
         if id1.replace(a, b) == id2 or id2.replace(a, b) == id1:
             return True
-    # 編輯距離
     return difflib.SequenceMatcher(None, id1, id2).ratio() > 0.85
+
+def extract_below_keyword(text, keyword):
+    lines = text.split('\n')
+    for i, line in enumerate(lines):
+        if keyword in line and i+1 < len(lines):
+            next_line = lines[i+1].strip()
+            if not re.match(r'^(複製|コピー|Copy)?$', next_line, re.IGNORECASE) and len(next_line) > 0:
+                return next_line
+    return None
 
 def extract_lineid_phone(image_path, debug=False):
     image = preprocess_image(image_path)
     text = pytesseract.image_to_string(image, lang='eng+chi_tra')
-    # 手機號
-    phone_match = re.search(r'(09\d{8})|(?:\+?886\s?\d{2,3}\s?\d{3}\s?\d{3})', text.replace("-", ""))
-    phone = None
-    if phone_match:
-        phone = normalize_phone(phone_match.group(0))
-
-    # 用 image_to_data 合併多框，解決ID被截斷
-    data = pytesseract.image_to_data(image, lang='eng+chi_tra', output_type=pytesseract.Output.DICT)
-    words = data['text']
-    line_id = None
-
-    for i, word in enumerate(words):
-        if isinstance(word, str) and word and re.match(r'^ID$', word, re.IGNORECASE):
-            next_words = []
-            for j in range(1, 4):
-                if i + j < len(words):
-                    w = words[i + j]
-                    if w and not re.match(r'^(複製|コピー|Copy)$', w, re.IGNORECASE):
-                        next_words.append(w.strip())
-                    else:
-                        break
-            if next_words:
-                candidate = ''.join(next_words)
-                candidate = re.split(r'(複製|コピー|Copy)', candidate)[0].strip()
-                if candidate:
-                    line_id = candidate
-                    break
-
-    # fallback: 單行正則
+    phone = extract_below_keyword(text, "電話號碼")
+    phone = normalize_phone(phone)
+    line_id = extract_below_keyword(text, "ID")
     if not line_id:
-        lineid_match = re.search(r'ID\s*:?[\s\n]*([^\s]+)', text, re.IGNORECASE)
-        if lineid_match:
-            line_id = re.split(r'(複製|コピー|Copy)', lineid_match.group(1))[0].strip()
-
+        # fallback: 原本的 OCR 抓法
+        data = pytesseract.image_to_data(image, lang='eng+chi_tra', output_type=pytesseract.Output.DICT)
+        words = data['text']
+        for i, word in enumerate(words):
+            if isinstance(word, str) and word and re.match(r'^ID$', word, re.IGNORECASE):
+                next_words = []
+                for j in range(1, 4):
+                    if i + j < len(words):
+                        w = words[i + j]
+                        if w and not re.match(r'^(複製|コピー|Copy)$', w, re.IGNORECASE):
+                            next_words.append(w.strip())
+                        else:
+                            break
+                if next_words:
+                    candidate = ''.join(next_words)
+                    candidate = re.split(r'(複製|コピー|Copy)', candidate)[0].strip()
+                    if candidate:
+                        line_id = candidate
+                        break
+        if not line_id:
+            lineid_match = re.search(r'ID\s*:?[\s\n]*([^\s]+)', text, re.IGNORECASE)
+            if lineid_match:
+                line_id = re.split(r'(複製|コピー|Copy)', lineid_match.group(1))[0].strip()
     if debug:
         print("OCR全文：", text)
-        print("image_to_data：", words)
-        print("抓到ID：", line_id)
-
+        print("電話號碼：", phone)
+        print("LINE ID：", line_id)
     return phone, line_id, text, similar_id
