@@ -4,12 +4,12 @@ import pytesseract
 
 def preprocess_image(image_path):
     image = Image.open(image_path)
-    # 轉灰階
+    # 灰階
     image = image.convert('L')
     # 增強對比
     enhancer = ImageEnhance.Contrast(image)
     image = enhancer.enhance(2)
-    # 簡單二值化
+    # 二值化
     image = image.point(lambda x: 0 if x < 140 else 255, '1')
     return image
 
@@ -34,7 +34,6 @@ def normalize_text(text):
     return text
 
 def extract_lineid_phone(image_path):
-    # 新增預處理流程
     image = preprocess_image(image_path)
     text = pytesseract.image_to_string(image, lang='eng+chi_tra')
     # 手機號
@@ -42,10 +41,9 @@ def extract_lineid_phone(image_path):
     phone = None
     if phone_match:
         phone = normalize_phone(phone_match.group(0))
-    # LINE ID（去掉「複製」字）
-    lineid_match = re.search(r'ID\s*:?[\s\n]*([A-Za-z0-9_.-]+)', text, re.IGNORECASE)
+    # LINE ID 抓取直到遇到空白、換行或「複製」就停止
+    lineid_match = re.search(r'ID\s*:?[\s\n]*([^\s複製]+)', text, re.IGNORECASE)
     line_id = None
     if lineid_match:
-        line_id = lineid_match.group(1)
-        line_id = line_id.split("複製")[0].strip()
+        line_id = lineid_match.group(1).strip()
     return phone, line_id, text
