@@ -18,12 +18,9 @@ def normalize_text(text):
 
 def normalize_phone(phone):
     phone = re.sub(r'\D', '', phone)
-    # +886903587063 or 886903587063 -> 0903587063
     if phone.startswith('8869') and len(phone) == 12:
         phone = '09' + phone[4:]
     elif phone.startswith('09') and len(phone) == 10:
-        pass
-    else:
         pass
     return phone
 
@@ -52,7 +49,6 @@ def extract_lineid_phone(image_path, debug=False):
     phone = None
     if phone_match:
         phone = normalize_phone(phone_match.group(0))
-    # 先用正則抓
     lineid_match = re.search(r'ID\s*:?[\s\n]*([^\s複製]+)', text, re.IGNORECASE)
     data = pytesseract.image_to_data(image, lang='eng+chi_tra', output_type=pytesseract.Output.DICT)
     words = data['text']
@@ -62,7 +58,6 @@ def extract_lineid_phone(image_path, debug=False):
         if candidate and not is_fake_line_id(candidate):
             line_id = candidate
 
-    # 進階合併多框
     for i, word in enumerate(words):
         if isinstance(word, str) and word and re.match(r'^ID$', word, re.IGNORECASE):
             next_words = []
@@ -80,7 +75,6 @@ def extract_lineid_phone(image_path, debug=False):
                     line_id = candidate
                     break
 
-    # fallback
     if not line_id:
         lineid_match = re.search(r'ID\s*:?[\s\n]*([^\s]+)', text, re.IGNORECASE)
         if lineid_match:
