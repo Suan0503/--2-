@@ -14,9 +14,8 @@ import pytz
 from draw_utils import draw_coupon, get_today_coupon_flex, has_drawn_today, save_coupon_record
 
 # OCR 模組
-from image_verification import extract_lineid_phone
+from image_verification import extract_lineid_phone, normalize_text
 
-# 新增：手動通過名單模組
 from special_case import is_special_case, add_special_case
 
 load_dotenv()
@@ -129,7 +128,6 @@ def choose_link():
     ]
     return group[hash(os.urandom(8)) % len(group)]
 
-# === 新增：比對時忽略大小寫，O/0視為一樣 ===
 def normalize_id(s):
     if not isinstance(s, str):
         return ""
@@ -170,7 +168,6 @@ def handle_message(event):
     profile = line_bot_api.get_profile(user_id)
     display_name = profile.display_name
 
-    # === 關閉手動通過功能 ===
     if user_text == "手動通過":
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 此功能已關閉"))
         return
@@ -243,14 +240,13 @@ def handle_message(event):
         )
         return
 
-    # 步驟二：輸入 LINE ID
     if user_id in temp_users and temp_users[user_id].get("step", "waiting_lineid") == "waiting_lineid" and len(user_text) >= 2:
         record = temp_users[user_id]
         input_lineid = user_text.strip()
         if input_lineid.lower().startswith("id") and len(input_lineid) >= 11:
             phone_candidate = re.sub(r"[^\d]", "", input_lineid)
             if len(phone_candidate) == 10 and phone_candidate.startswith("09"):
-                record["line_id"] = phone_candidate  # 手機號=ID
+                record["line_id"] = phone_candidate
             else:
                 record["line_id"] = input_lineid
         elif input_lineid in ["尚未設定", "無ID", "無", "沒有", "未設定"]:
@@ -271,7 +267,6 @@ def handle_message(event):
         )
         return
 
-    # 步驟四：用戶確認
     if user_text == "1" and user_id in temp_users and temp_users[user_id].get("step") == "waiting_confirm":
         data = temp_users[user_id]
         now = datetime.now(tz)
@@ -310,14 +305,12 @@ def handle_message(event):
         temp_users.pop(user_id)
         return
 
-# 處理 LINE 截圖上傳並 OCR 驗證
 @handler.add(MessageEvent, message=ImageMessage)
 def handle_image(event):
     user_id = event.source.user_id
     if user_id not in temp_users or temp_users[user_id].get("step") != "waiting_screenshot":
-        return  # 非驗證流程不處理
+        return
 
-    # 特殊名單直接通過（如果未來這功能也要關閉，可直接刪除這段）
     if is_special_case(user_id):
         record = temp_users[user_id]
         reply = (
@@ -340,15 +333,13 @@ def handle_image(event):
         for chunk in message_content.iter_content():
             fd.write(chunk)
 
-    # OCR 驗證
     phone_ocr, lineid_ocr, ocr_text = extract_lineid_phone(image_path)
     input_phone = temp_users[user_id].get("phone")
     input_lineid = temp_users[user_id].get("line_id")
 
     record = temp_users[user_id]
     if input_lineid == "尚未設定":
-        # 只比對手機號即可
-        if phone_ocr == input_phone:
+        if normalize_text(phone_ocr) == normalize_text(input_phone):
             reply = (
                 f"📱 {record['phone']}\n"
                 f"🌸 暱稱：{record['name']}\n"
@@ -363,11 +354,14 @@ def handle_image(event):
         else:
             line_bot_api.reply_message(
                 event.reply_token,
-                TextSendMessage(text="❌ 截圖中的手機號碼與您輸入的不符，請重新上傳正確的 LINE 個人頁面截圖。")
+                TextSendMessage(
+                    text=f"❌ 截圖中的手機號碼與您輸入的不符，請重新上傳正確的 LINE 個人頁面截圖。\n"
+                         f"【OCR結果】手機:{phone_ocr or '未識別'}\nLINE ID:{lineid_ocr or '未識別'}"
+                )
             )
     else:
-        # === 這裡用 normalize_id 處理 ===
-        if phone_ocr == input_phone and (normalize_id(lineid_ocr) == normalize_id(input_lineid) or lineid_ocr == "尚未設定"):
+        if normalize_text(phone_ocr) == normalize_text(input_phone) and (
+            normalize_text(lineid_ocr) == normalize_text(input_lineid) or lineid_ocr == "尚未設定"):
             reply = (
                 f"📱 {record['phone']}\n"
                 f"🌸 暱稱：{record['name']}\n"
@@ -382,7 +376,10 @@ def handle_image(event):
         else:
             line_bot_api.reply_message(
                 event.reply_token,
-                TextSendMessage(text="❌ 截圖中的手機號碼或 LINE ID 與您輸入的不符，請重新上傳正確的 LINE 個人頁面截圖。")
+                TextSendMessage(
+                    text=f"❌ 截圖中的手機號碼或 LINE ID 與您輸入的不符，請重新上傳正確的 LINE 個人頁面截圖。\n"
+                         f"【OCR結果】手機:{phone_ocr or '未識別'}\nLINE ID:{lineid_ocr or '未識別'}"
+                )
             )
 
 @app.route("/ocr", methods=["POST"])
