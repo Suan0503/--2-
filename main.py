@@ -215,6 +215,31 @@ def handle_message(event):
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="⚠️ 你已驗證完成，請輸入手機號碼查看驗證資訊"))
         return
 
+    # 用戶回覆多選 LINE ID 的情境
+    if user_id in temp_users and temp_users[user_id].get("step") == "waiting_lineid_choice":
+        try:
+            idx = int(user_text.strip()) - 1
+            lineid_candidates = temp_users[user_id]["lineid_candidates"]
+            chosen = lineid_candidates[idx]
+            temp_users[user_id]["line_id"] = chosen
+            temp_users[user_id]["step"] = "waiting_screenshot"
+            del temp_users[user_id]["lineid_candidates"]
+            line_bot_api.reply_message(
+                event.reply_token,
+                TextSendMessage(
+                    text=(
+                        f"你選擇的 LINE ID 為：{chosen}\n"
+                        "請上傳您的 LINE 個人頁面截圖（需清楚顯示手機號與 LINE ID）以供驗證。"
+                    )
+                )
+            )
+        except Exception:
+            line_bot_api.reply_message(
+                event.reply_token,
+                TextSendMessage(text="請輸入正確的編號選擇 LINE ID。")
+            )
+        return
+
     if re.match(r"^09\d{8}$", user_text):
         black = Blacklist.query.filter_by(phone=user_text).first()
         if black:
@@ -333,6 +358,21 @@ def handle_image(event):
     input_phone = temp_users[user_id].get("phone")
     input_lineid = temp_users[user_id].get("line_id")
     record = temp_users[user_id]
+
+    # 1. 多候選 LINE ID 處理
+    if isinstance(lineid_ocr, list) and len(lineid_ocr) > 1:
+        temp_users[user_id]["lineid_candidates"] = lineid_ocr
+        temp_users[user_id]["step"] = "waiting_lineid_choice"
+        options = "\n".join([f"{i+1}. {lid}" for i, lid in enumerate(lineid_ocr)])
+        msg = (
+            "請選擇正確的 LINE ID：\n"
+            f"{options}\n"
+            "請輸入編號選擇："
+        )
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=msg))
+        return
+    elif isinstance(lineid_ocr, list) and len(lineid_ocr) == 1:
+        lineid_ocr = lineid_ocr[0]
 
     if input_lineid == "尚未設定":
         if phone_ocr == input_phone:
