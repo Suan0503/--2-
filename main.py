@@ -16,6 +16,9 @@ from draw_utils import draw_coupon, get_today_coupon_flex, has_drawn_today, save
 # OCR 模組
 from image_verification import extract_lineid_phone
 
+# 新增：手動通過名單模組
+from special_case import is_special_case, add_special_case
+
 load_dotenv()
 
 app = Flask(__name__)
@@ -161,6 +164,15 @@ def handle_message(event):
     profile = line_bot_api.get_profile(user_id)
     display_name = profile.display_name
 
+    # 手動通過指令
+    if user_text == "手動通過":
+        # 若要限制權限可加 user_id 判斷
+        if add_special_case(user_id):
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="✅ 本用戶已加入手動通過名單！"))
+        else:
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="⚠️ 本用戶早已在手動通過名單內。"))
+        return
+
     if user_text == "驗證資訊":
         existing = Whitelist.query.filter_by(line_user_id=user_id).first()
         if existing:
@@ -233,7 +245,6 @@ def handle_message(event):
     if user_id in temp_users and temp_users[user_id].get("step", "waiting_lineid") == "waiting_lineid" and len(user_text) >= 2:
         record = temp_users[user_id]
         input_lineid = user_text.strip()
-        # 處理 ID:09XXXXXXXXX
         if input_lineid.lower().startswith("id") and len(input_lineid) >= 11:
             phone_candidate = re.sub(r"[^\d]", "", input_lineid)
             if len(phone_candidate) == 10 and phone_candidate.startswith("09"):
@@ -303,6 +314,23 @@ def handle_image(event):
     user_id = event.source.user_id
     if user_id not in temp_users or temp_users[user_id].get("step") != "waiting_screenshot":
         return  # 非驗證流程不處理
+
+    # 特殊名單直接通過
+    if is_special_case(user_id):
+        record = temp_users[user_id]
+        reply = (
+            f"📱 {record['phone']}\n"
+            f"🌸 暱稱：{record['name']}\n"
+            f"       個人編號：待驗證後產生\n"
+            f"🔗 LINE ID：{record['line_id']}\n"
+            f"（此用戶經手動通過）\n"
+            f"請問以上資料是否正確？正確請回復 1\n"
+            f"⚠️輸入錯誤請從新輸入手機號碼即可⚠️"
+        )
+        record["step"] = "waiting_confirm"
+        temp_users[user_id] = record
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
+        return
 
     message_content = line_bot_api.get_message_content(event.message.id)
     image_path = f"/tmp/{user_id}_line_profile.png"
