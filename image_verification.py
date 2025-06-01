@@ -1,16 +1,20 @@
 import re
-from PIL import Image, ImageEnhance
+from PIL import Image, ImageEnhance, ImageOps
 import pytesseract
 
 def preprocess_image(image_path):
     image = Image.open(image_path)
     # 灰階
     image = image.convert('L')
+    # 檢查是否為白底（亮像素明顯多）
+    hist = image.histogram()
+    if sum(hist[200:]) > sum(hist[:55]):  # 白色像素大於黑色像素
+        image = ImageOps.invert(image)
     # 增強對比
     enhancer = ImageEnhance.Contrast(image)
     image = enhancer.enhance(2)
-    # 二值化
-    image = image.point(lambda x: 0 if x < 140 else 255, '1')
+    # 二值化，針對白底建議閾值再低一點如120
+    image = image.point(lambda x: 0 if x < 120 else 255, '1')
     return image
 
 def normalize_phone(phone):
