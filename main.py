@@ -129,6 +129,12 @@ def choose_link():
     ]
     return group[hash(os.urandom(8)) % len(group)]
 
+# === 新增：比對時忽略大小寫，O/0視為一樣 ===
+def normalize_id(s):
+    if not isinstance(s, str):
+        return ""
+    return s.lower().replace('o', '0').replace('Ｏ', '0').replace('ｏ', '0')
+
 @app.route("/")
 def home():
     return "LINE Bot 正常運作中～🍵"
@@ -164,13 +170,9 @@ def handle_message(event):
     profile = line_bot_api.get_profile(user_id)
     display_name = profile.display_name
 
-    # 手動通過指令
+    # === 關閉手動通過功能 ===
     if user_text == "手動通過":
-        # 若要限制權限可加 user_id 判斷
-        if add_special_case(user_id):
-            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="✅ 本用戶已加入手動通過名單！"))
-        else:
-            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="⚠️ 本用戶早已在手動通過名單內。"))
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 此功能已關閉"))
         return
 
     if user_text == "驗證資訊":
@@ -315,7 +317,7 @@ def handle_image(event):
     if user_id not in temp_users or temp_users[user_id].get("step") != "waiting_screenshot":
         return  # 非驗證流程不處理
 
-    # 特殊名單直接通過
+    # 特殊名單直接通過（如果未來這功能也要關閉，可直接刪除這段）
     if is_special_case(user_id):
         record = temp_users[user_id]
         reply = (
@@ -364,8 +366,8 @@ def handle_image(event):
                 TextSendMessage(text="❌ 截圖中的手機號碼與您輸入的不符，請重新上傳正確的 LINE 個人頁面截圖。")
             )
     else:
-        # 比對手機號與ID（OCR結果ID也是"尚未設定"也可）
-        if phone_ocr == input_phone and (lineid_ocr == input_lineid or lineid_ocr == "尚未設定"):
+        # === 這裡用 normalize_id 處理 ===
+        if phone_ocr == input_phone and (normalize_id(lineid_ocr) == normalize_id(input_lineid) or lineid_ocr == "尚未設定"):
             reply = (
                 f"📱 {record['phone']}\n"
                 f"🌸 暱稱：{record['name']}\n"
