@@ -16,6 +16,7 @@ from draw_utils import draw_coupon, get_today_coupon_flex, has_drawn_today, save
 # OCR 模組
 from image_verification import extract_lineid_phone, normalize_text
 
+# 新增：手動通過名單模組
 from special_case import is_special_case, add_special_case
 
 load_dotenv()
@@ -127,11 +128,6 @@ def choose_link():
         "https://line.me/ti/p/AKRUvSCLRC"
     ]
     return group[hash(os.urandom(8)) % len(group)]
-
-def normalize_id(s):
-    if not isinstance(s, str):
-        return ""
-    return s.lower().replace('o', '0').replace('Ｏ', '0').replace('ｏ', '0')
 
 @app.route("/")
 def home():
@@ -246,7 +242,7 @@ def handle_message(event):
         if input_lineid.lower().startswith("id") and len(input_lineid) >= 11:
             phone_candidate = re.sub(r"[^\d]", "", input_lineid)
             if len(phone_candidate) == 10 and phone_candidate.startswith("09"):
-                record["line_id"] = phone_candidate
+                record["line_id"] = phone_candidate  # 手機號=ID
             else:
                 record["line_id"] = input_lineid
         elif input_lineid in ["尚未設定", "無ID", "無", "沒有", "未設定"]:
@@ -309,8 +305,9 @@ def handle_message(event):
 def handle_image(event):
     user_id = event.source.user_id
     if user_id not in temp_users or temp_users[user_id].get("step") != "waiting_screenshot":
-        return
+        return  # 非驗證流程不處理
 
+    # 特殊名單直接通過
     if is_special_case(user_id):
         record = temp_users[user_id]
         reply = (
@@ -333,13 +330,15 @@ def handle_image(event):
         for chunk in message_content.iter_content():
             fd.write(chunk)
 
-    phone_ocr, lineid_ocr, ocr_text = extract_lineid_phone(image_path)
+    # OCR 驗證（新版，回傳四個值，含 similar_id function）
+    phone_ocr, lineid_ocr, ocr_text, similar_id = extract_lineid_phone(image_path)
     input_phone = temp_users[user_id].get("phone")
     input_lineid = temp_users[user_id].get("line_id")
 
     record = temp_users[user_id]
+
     if input_lineid == "尚未設定":
-        if normalize_text(phone_ocr) == normalize_text(input_phone):
+        if phone_ocr == input_phone:
             reply = (
                 f"📱 {record['phone']}\n"
                 f"🌸 暱稱：{record['name']}\n"
@@ -354,14 +353,12 @@ def handle_image(event):
         else:
             line_bot_api.reply_message(
                 event.reply_token,
-                TextSendMessage(
-                    text=f"❌ 截圖中的手機號碼與您輸入的不符，請重新上傳正確的 LINE 個人頁面截圖。\n"
-                         f"【OCR結果】手機:{phone_ocr or '未識別'}\nLINE ID:{lineid_ocr or '未識別'}"
-                )
+                TextSendMessage(text="❌ 截圖中的手機號碼與您輸入的不符，請重新上傳正確的 LINE 個人頁面截圖。")
             )
     else:
-        if normalize_text(phone_ocr) == normalize_text(input_phone) and (
-            normalize_text(lineid_ocr) == normalize_text(input_lineid) or lineid_ocr == "尚未設定"):
+        # 使用新版模糊比對
+        lineid_match = similar_id(normalize_text(lineid_ocr), normalize_text(input_lineid))
+        if phone_ocr == input_phone and (lineid_match or lineid_ocr == "尚未設定"):
             reply = (
                 f"📱 {record['phone']}\n"
                 f"🌸 暱稱：{record['name']}\n"
@@ -377,8 +374,10 @@ def handle_image(event):
             line_bot_api.reply_message(
                 event.reply_token,
                 TextSendMessage(
-                    text=f"❌ 截圖中的手機號碼或 LINE ID 與您輸入的不符，請重新上傳正確的 LINE 個人頁面截圖。\n"
-                         f"【圖片偵測結果】手機:{phone_ocr or '未識別'}\nLINE ID:{lineid_ocr or '未識別'}"
+                    text=(
+                        "❌ 截圖中的手機號碼或 LINE ID 與您輸入的不符，請重新上傳正確的 LINE 個人頁面截圖。\n"
+                        f"【圖片偵測結果】手機:{phone_ocr or '未識別'}\nLINE ID:{lineid_ocr or '未識別'}"
+                    )
                 )
             )
 
@@ -389,7 +388,7 @@ def ocr_image_verification():
     file = request.files["image"]
     file_path = "temp_ocr_img.png"
     file.save(file_path)
-    phone, line_id, text = extract_lineid_phone(file_path)
+    phone, line_id, text, _ = extract_lineid_phone(file_path)
     os.remove(file_path)
     return jsonify({
         "phone": phone,
