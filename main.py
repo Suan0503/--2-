@@ -73,14 +73,12 @@ def get_function_menu_flex():
                         "margin": "lg",
                         "spacing": "sm",
                         "contents": [
-                            # 按鈕1
                             {
                                 "type": "button",
                                 "action": {"type": "message", "label": "📱 驗證資訊", "text": "驗證資訊"},
                                 "style": "primary",
-                                "color": "#FFB6B6"  # 粉紅
+                                "color": "#FFB6B6"
                             },
-                            # 按鈕2
                             {
                                 "type": "button",
                                 "action": {
@@ -89,23 +87,20 @@ def get_function_menu_flex():
                                     "uri": "https://t.me/+XgwLCJ6kdhhhZDE1"
                                 },
                                 "style": "secondary",
-                                "color": "#FFF8B7"  # 淡黃
+                                "color": "#FFF8B7"
                             },
-                            # 按鈕3
                             {
                                 "type": "button",
                                 "action": {"type": "message", "label": "🎁 每日抽獎", "text": "每日抽獎"},
                                 "style": "primary",
-                                "color": "#A3DEE6"  # 淡藍
+                                "color": "#A3DEE6"
                             },
-                            # 按鈕4
                             {
                                 "type": "button",
                                 "action": {"type": "uri", "label": "📬 預約諮詢", "uri": choose_link()},
                                 "style": "primary",
-                                "color": "#B889F2"  # 淡紫
+                                "color": "#B889F2"
                             },
-                            # 按鈕5（新）
                             {
                                 "type": "button",
                                 "action": {
@@ -114,7 +109,7 @@ def get_function_menu_flex():
                                     "uri": "https://line.me/ti/g2/mq8VqBIVupL1lsIXuAulnqZNz5vw7VKrVYjNDg?utm_source=invitation&utm_medium=link_copy&utm_campaign=default"
                                 },
                                 "style": "primary",
-                                "color": "#FFDCFF"  # 很可愛的淡粉紫
+                                "color": "#FFDCFF"
                             }
                         ]
                     }
@@ -229,15 +224,26 @@ def handle_message(event):
             event.reply_token,
             [
                 TextSendMessage(text="📱 手機已登記囉～請接著輸入您的 LINE ID"),
-                TextSendMessage(text="（如無 ID 請輸入：無ID）\n若手機就是 ID，請開頭輸入ID兩字（ID09XXXXXXXX）")
+                TextSendMessage(text="（如無 ID 請輸入：尚未設定）\n若手機就是 ID，請開頭輸入ID兩字（ID09XXXXXXXX）")
             ]
         )
         return
 
     # 步驟二：輸入 LINE ID
-    if user_id in temp_users and temp_users[user_id].get("step", "waiting_lineid") == "waiting_lineid" and len(user_text) >= 4:
+    if user_id in temp_users and temp_users[user_id].get("step", "waiting_lineid") == "waiting_lineid" and len(user_text) >= 2:
         record = temp_users[user_id]
-        record["line_id"] = user_text
+        input_lineid = user_text.strip()
+        # 處理 ID:09XXXXXXXXX
+        if input_lineid.lower().startswith("id") and len(input_lineid) >= 11:
+            phone_candidate = re.sub(r"[^\d]", "", input_lineid)
+            if len(phone_candidate) == 10 and phone_candidate.startswith("09"):
+                record["line_id"] = phone_candidate  # 手機號=ID
+            else:
+                record["line_id"] = input_lineid
+        elif input_lineid in ["尚未設定", "無ID", "無", "沒有", "未設定"]:
+            record["line_id"] = "尚未設定"
+        else:
+            record["line_id"] = input_lineid
         record["step"] = "waiting_screenshot"
         temp_users[user_id] = record
 
@@ -298,7 +304,6 @@ def handle_image(event):
     if user_id not in temp_users or temp_users[user_id].get("step") != "waiting_screenshot":
         return  # 非驗證流程不處理
 
-    # 下載圖片
     message_content = line_bot_api.get_message_content(event.message.id)
     image_path = f"/tmp/{user_id}_line_profile.png"
     with open(image_path, 'wb') as fd:
@@ -310,25 +315,45 @@ def handle_image(event):
     input_phone = temp_users[user_id].get("phone")
     input_lineid = temp_users[user_id].get("line_id")
 
-    # 比對 OCR 結果
-    if phone_ocr == input_phone and lineid_ocr == input_lineid:
-        record = temp_users[user_id]
-        reply = (
-            f"📱 {record['phone']}\n"
-            f"🌸 暱稱：{record['name']}\n"
-            f"       個人編號：待驗證後產生\n"
-            f"🔗 LINE ID：{record['line_id']}\n"
-            f"請問以上資料是否正確？正確請回復 1\n"
-            f"⚠️輸入錯誤請從新輸入手機號碼即可⚠️"
-        )
-        record["step"] = "waiting_confirm"
-        temp_users[user_id] = record
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
+    record = temp_users[user_id]
+    if input_lineid == "尚未設定":
+        # 只比對手機號即可
+        if phone_ocr == input_phone:
+            reply = (
+                f"📱 {record['phone']}\n"
+                f"🌸 暱稱：{record['name']}\n"
+                f"       個人編號：待驗證後產生\n"
+                f"🔗 LINE ID：尚未設定\n"
+                f"請問以上資料是否正確？正確請回復 1\n"
+                f"⚠️輸入錯誤請從新輸入手機號碼即可⚠️"
+            )
+            record["step"] = "waiting_confirm"
+            temp_users[user_id] = record
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
+        else:
+            line_bot_api.reply_message(
+                event.reply_token,
+                TextSendMessage(text="❌ 截圖中的手機號碼與您輸入的不符，請重新上傳正確的 LINE 個人頁面截圖。")
+            )
     else:
-        line_bot_api.reply_message(
-            event.reply_token,
-            TextSendMessage(text="❌ 截圖中的手機號碼或 LINE ID 與您輸入的不符，請重新上傳正確的 LINE 個人頁面截圖。")
-        )
+        # 比對手機號與ID（OCR結果ID也是"尚未設定"也可）
+        if phone_ocr == input_phone and (lineid_ocr == input_lineid or lineid_ocr == "尚未設定"):
+            reply = (
+                f"📱 {record['phone']}\n"
+                f"🌸 暱稱：{record['name']}\n"
+                f"       個人編號：待驗證後產生\n"
+                f"🔗 LINE ID：{record['line_id']}\n"
+                f"請問以上資料是否正確？正確請回復 1\n"
+                f"⚠️輸入錯誤請從新輸入手機號碼即可⚠️"
+            )
+            record["step"] = "waiting_confirm"
+            temp_users[user_id] = record
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
+        else:
+            line_bot_api.reply_message(
+                event.reply_token,
+                TextSendMessage(text="❌ 截圖中的手機號碼或 LINE ID 與您輸入的不符，請重新上傳正確的 LINE 個人頁面截圖。")
+            )
 
 @app.route("/ocr", methods=["POST"])
 def ocr_image_verification():
