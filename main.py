@@ -13,8 +13,8 @@ import traceback
 import pytz
 
 from draw_utils import draw_coupon, get_today_coupon_flex, has_drawn_today, save_coupon_record
-from image_verification import extract_lineid_phone, normalize_text, similar_id
-from special_case import is_special_case, add_special_case
+from image_verification import extract_lineid_phone
+from special_case import is_special_case
 
 load_dotenv()
 
@@ -212,32 +212,6 @@ def handle_message(event):
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="⚠️ 你已驗證完成，請輸入手機號碼查看驗證資訊"))
         return
 
-    # 用戶 LINE ID 多選
-    if user_id in temp_users and temp_users[user_id].get("step") == "waiting_lineid_choice":
-        try:
-            idx = int(user_text.strip()) - 1
-            lineid_candidates = temp_users[user_id]["lineid_candidates"]
-            chosen = lineid_candidates[idx]
-            temp_users[user_id]["line_id"] = chosen
-            record = temp_users[user_id]
-            reply = (
-                f"📱 {record['phone']}\n"
-                f"🌸 暱稱：{record['name']}\n"
-                f"       個人編號：待驗證後產生\n"
-                f"🔗 LINE ID：{chosen}\n"
-                f"請問以上資料是否正確？正確請回復 1\n"
-                f"⚠️輸入錯誤請從新輸入手機號碼即可⚠️"
-            )
-            temp_users[user_id]["step"] = "waiting_confirm"
-            del temp_users[user_id]["lineid_candidates"]
-            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
-        except Exception:
-            line_bot_api.reply_message(
-                event.reply_token,
-                TextSendMessage(text="請輸入正確的編號選擇 LINE ID。")
-            )
-        return
-
     if re.match(r"^09\d{8}$", user_text):
         black = Blacklist.query.filter_by(phone=user_text).first()
         if black:
@@ -352,24 +326,11 @@ def handle_image(event):
         for chunk in message_content.iter_content():
             fd.write(chunk)
 
-    phone_ocr, lineid_ocr, ocr_text, similar_id_result = extract_lineid_phone(image_path)
+    # 用簡化版 extract_lineid_phone，回傳 phone, lineid, ocr_text
+    phone_ocr, lineid_ocr, ocr_text = extract_lineid_phone(image_path)
     input_phone = temp_users[user_id].get("phone")
     input_lineid = temp_users[user_id].get("line_id")
     record = temp_users[user_id]
-
-    if isinstance(lineid_ocr, list) and len(lineid_ocr) > 1:
-        temp_users[user_id]["lineid_candidates"] = lineid_ocr
-        temp_users[user_id]["step"] = "waiting_lineid_choice"
-        options = "\n".join([f"{i+1}. {lid}" for i, lid in enumerate(lineid_ocr)])
-        msg = (
-            "請選擇正確的 LINE ID：\n"
-            f"{options}\n"
-            "請輸入編號選擇："
-        )
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=msg))
-        return
-    elif isinstance(lineid_ocr, list) and len(lineid_ocr) == 1:
-        lineid_ocr = lineid_ocr[0]
 
     if input_lineid == "尚未設定":
         if phone_ocr == input_phone:
@@ -390,7 +351,7 @@ def handle_image(event):
                 TextSendMessage(text="❌ 截圖中的手機號碼與您輸入的不符，請重新上傳正確的 LINE 個人頁面截圖。")
             )
     else:
-        lineid_match = similar_id(normalize_text(lineid_ocr), normalize_text(input_lineid))
+        lineid_match = (lineid_ocr is not None and input_lineid is not None and lineid_ocr.lower() == input_lineid.lower())
         if phone_ocr == input_phone and (lineid_match or lineid_ocr == "尚未設定"):
             reply = (
                 f"📱 {record['phone']}\n"
@@ -421,7 +382,7 @@ def ocr_image_verification():
     file = request.files["image"]
     file_path = "temp_ocr_img.png"
     file.save(file_path)
-    phone, line_id, text, _ = extract_lineid_phone(file_path)
+    phone, line_id, text = extract_lineid_phone(file_path)
     os.remove(file_path)
     return jsonify({
         "phone": phone,
