@@ -11,8 +11,8 @@ import os
 import re
 import traceback
 import pytz
-from draw_utils import draw_coupon, get_today_coupon_flex, has_drawn_today, save_coupon_record
 
+from draw_utils import draw_coupon, get_today_coupon_flex, has_drawn_today, save_coupon_record
 from image_verification import extract_lineid_phone, normalize_text, similar_id
 from special_case import is_special_case, add_special_case
 
@@ -21,8 +21,8 @@ load_dotenv()
 app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-
 db = SQLAlchemy(app)
+
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
 LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET")
 line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
@@ -212,7 +212,7 @@ def handle_message(event):
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="⚠️ 你已驗證完成，請輸入手機號碼查看驗證資訊"))
         return
 
-    # 重要：用戶選擇 LINE ID 的情境，直接進入確認
+    # 用戶 LINE ID 多選
     if user_id in temp_users and temp_users[user_id].get("step") == "waiting_lineid_choice":
         try:
             idx = int(user_text.strip()) - 1
@@ -357,7 +357,6 @@ def handle_image(event):
     input_lineid = temp_users[user_id].get("line_id")
     record = temp_users[user_id]
 
-    # 多候選 LINE ID：進入多選流程
     if isinstance(lineid_ocr, list) and len(lineid_ocr) > 1:
         temp_users[user_id]["lineid_candidates"] = lineid_ocr
         temp_users[user_id]["step"] = "waiting_lineid_choice"
@@ -391,7 +390,6 @@ def handle_image(event):
                 TextSendMessage(text="❌ 截圖中的手機號碼與您輸入的不符，請重新上傳正確的 LINE 個人頁面截圖。")
             )
     else:
-        # None 防呆
         lineid_match = similar_id(normalize_text(lineid_ocr), normalize_text(input_lineid))
         if phone_ocr == input_phone and (lineid_match or lineid_ocr == "尚未設定"):
             reply = (
