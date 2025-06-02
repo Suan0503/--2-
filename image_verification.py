@@ -131,5 +131,9 @@ if __name__ == "__main__":
     if isinstance(lineid_result, list):
         print("請選擇正確的 LINE ID：")
         for idx, lid in enumerate(lineid_result, 1):
-            print(f"{
-
+            print(f"{idx}. {lid}")
+        user_input = input("請輸入編號選擇：")
+        selected_line_id = lineid_result[int(user_input)-1]
+        print(f"你選擇的 LINE ID 是: {selected_line_id}")
+    else:
+        print(f"LINE ID: {lineid_result}")
