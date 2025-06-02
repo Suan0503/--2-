@@ -352,7 +352,7 @@ def handle_image(event):
         for chunk in message_content.iter_content():
             fd.write(chunk)
 
-    phone_ocr, lineid_ocr, ocr_text, similar_id = extract_lineid_phone(image_path)
+    phone_ocr, lineid_ocr, ocr_text, similar_id_result = extract_lineid_phone(image_path)
     input_phone = temp_users[user_id].get("phone")
     input_lineid = temp_users[user_id].get("line_id")
     record = temp_users[user_id]
@@ -391,6 +391,7 @@ def handle_image(event):
                 TextSendMessage(text="❌ 截圖中的手機號碼與您輸入的不符，請重新上傳正確的 LINE 個人頁面截圖。")
             )
     else:
+        # None 防呆
         lineid_match = similar_id(normalize_text(lineid_ocr), normalize_text(input_lineid))
         if phone_ocr == input_phone and (lineid_match or lineid_ocr == "尚未設定"):
             reply = (
