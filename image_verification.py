@@ -1,6 +1,9 @@
 import re
 import pytesseract
 from PIL import Image, ImageOps, ImageEnhance
+import cv2
+import numpy as np
+import os
 
 def preprocess_image(image_path):
     image = Image.open(image_path)
@@ -43,9 +46,6 @@ def is_fake_line_id(lineid):
     return False
 
 def similar_id(id1, id2):
-    """
-    智慧比對 LINE ID，容許 O/0、S/5、I/1、l/1 混用
-    """
     def normalize_for_compare(s):
         s = normalize_text(s).lower()
         s = s.replace('0', 'o')
@@ -56,25 +56,17 @@ def similar_id(id1, id2):
     return normalize_for_compare(id1) == normalize_for_compare(id2)
 
 def generate_lineid_candidates(lineid):
-    """
-    根據 L/1、O/0、S/5、I/1 混用產生所有可能的 LINE ID 選項，去重。
-    """
     variants = set()
     base = lineid
     variants.add(base)
-    # O/0
     variants.add(base.replace('O', '0').replace('o', '0'))
     variants.add(base.replace('0', 'O').replace('0', 'o'))
-    # l/1
     variants.add(base.replace('l', '1'))
     variants.add(base.replace('1', 'l'))
-    # S/5
     variants.add(base.replace('S', '5').replace('s', '5'))
     variants.add(base.replace('5', 'S').replace('5', 's'))
-    # I/1
     variants.add(base.replace('I', '1').replace('i', '1'))
     variants.add(base.replace('1', 'I').replace('1', 'i'))
-    # 排列組合（只產生一層，避免無限）
     more = set()
     for v in list(variants):
         more.add(v.replace('O', '0').replace('o', '0'))
@@ -86,14 +78,10 @@ def generate_lineid_candidates(lineid):
         more.add(v.replace('I', '1').replace('i', '1'))
         more.add(v.replace('1', 'I').replace('1', 'i'))
     variants.update(more)
-    # 去掉明顯 fake
     variants = {v for v in variants if v and not is_fake_line_id(v)}
     return list(variants)
 
 def detect_profile_type(image_path):
-    """
-    根據「個人檔案」座標自動判斷 iOS 或 Android
-    """
     image = Image.open(image_path)
     data = pytesseract.image_to_data(image, lang='chi_tra+eng', output_type=pytesseract.Output.DICT)
     n_boxes = len(data['level'])
@@ -102,11 +90,8 @@ def detect_profile_type(image_path):
             x, y, w, h = data['left'][i], data['top'][i], data['width'][i], data['height'][i]
             img_w, img_h = image.size
             x_center = x + w / 2
-            # 上方（前15%）
             is_top = y < (img_h * 0.15)
-            # 中間（左右35%-65%）
             is_center = (img_w * 0.35) < x_center < (img_w * 0.65)
-            # 左側（左20%）
             is_left = x_center < (img_w * 0.2)
             if is_top and is_center:
                 return "iOS"
@@ -115,16 +100,12 @@ def detect_profile_type(image_path):
     return "Unknown"
 
 def specialize_ios(image):
-    # 這裡填寫 iOS 圖片的特化處理
     print("執行iOS特化處理")
-    # 例如：可加入 iOS 專用的 OCR 流程或影像增強
-    # ...
+    # 可加強 iOS 特化影像處理
 
 def specialize_android(image):
-    # 這裡填寫 Android 圖片的特化處理
     print("執行Android特化處理")
-    # 例如：可加入 Android 專用的 OCR 流程或影像增強
-    # ...
+    # 可加強 Android 特化影像處理
 
 def extract_lineid_phone(image_path, debug=False):
     image = preprocess_image(image_path)
@@ -163,7 +144,6 @@ def extract_lineid_phone(image_path, debug=False):
             candidate = re.split(r'(複製|コピー|Copy)', lineid_match.group(1))[0].strip()
             if candidate and not is_fake_line_id(candidate):
                 line_id = candidate
-    # 產生候選清單
     line_id_candidates = []
     if line_id:
         line_id_candidates = generate_lineid_candidates(line_id)
@@ -173,7 +153,6 @@ def extract_lineid_phone(image_path, debug=False):
         print("OCR全文：", text)
         print("image_to_data：", words)
         print("抓到ID候選：", line_id_candidates)
-    # 回傳時
     if len(line_id_candidates) > 1:
         return phone, line_id_candidates, text, similar_id
     elif len(line_id_candidates) == 1:
@@ -181,25 +160,58 @@ def extract_lineid_phone(image_path, debug=False):
     else:
         return phone, None, text, similar_id
 
+def detect_red_boxes(image_path):
+    """OpenCV 偵測紅框座標，回傳 [(x, y, w, h), ...]"""
+    image = cv2.imread(image_path)
+    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    lower_red1 = np.array([0, 100, 100])
+    upper_red1 = np.array([10, 255, 255])
+    lower_red2 = np.array([160, 100, 100])
+    upper_red2 = np.array([179, 255, 255])
+    mask1 = cv2.inRange(hsv, lower_red1, upper_red1)
+    mask2 = cv2.inRange(hsv, lower_red2, upper_red2)
+    mask = mask1 + mask2
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    boxes = []
+    for cnt in contours:
+        x, y, w, h = cv2.boundingRect(cnt)
+        if w > 30 and h > 30:  # 可依需求調整
+            boxes.append((x, y, w, h))
+    boxes = sorted(boxes, key=lambda b: (b[1], b[0]))
+    return boxes
+
+def crop_red_boxes(image_path, boxes, out_dir="crops"):
+    """根據紅框座標裁切圖片，儲存於 crops/ 並回傳 PIL.Image 物件和路徑"""
+    os.makedirs(out_dir, exist_ok=True)
+    img = Image.open(image_path)
+    crops = []
+    for i, (x, y, w, h) in enumerate(boxes):
+        crop = img.crop((x, y, x + w, y + h))
+        save_path = f"{out_dir}/crop_{i+1}.jpg"
+        crop.save(save_path)
+        crops.append((crop, save_path))
+    return crops
+
 if __name__ == "__main__":
     img_path = input("請輸入圖片路徑：")
-    device_type = detect_profile_type(img_path)
-    print("裝置判斷結果：", device_type)
-    img = Image.open(img_path)
-    if device_type == 'iOS':
-        specialize_ios(img)
-    elif device_type == 'Android':
-        specialize_android(img)
-    else:
-        print("無法判斷裝置型態")
-    phone, lineid_result, text, similar_id_func = extract_lineid_phone(img_path, debug=True)
-    print(f"【圖片偵測結果】\n手機:{phone}")
-    if isinstance(lineid_result, list):
-        print("請選擇正確的 LINE ID：")
-        for idx, lid in enumerate(lineid_result, 1):
-            print(f"{idx}. {lid}")
-        user_input = input("請輸入編號選擇：")
-        selected_line_id = lineid_result[int(user_input)-1]
-        print(f"你選擇的 LINE ID 是: {selected_line_id}")
-    else:
-        print(f"LINE ID: {lineid_result}")
+    boxes = detect_red_boxes(img_path)
+    if not boxes:
+        print("沒找到紅框！")
+        exit()
+    print(f"偵測到 {len(boxes)} 個紅框。")
+    crops = crop_red_boxes(img_path, boxes, out_dir="crops")
+    for i, (crop_img, save_path) in enumerate(crops):
+        print(f"紅框 {i+1} ({save_path}) OCR 結果：")
+        # 直接針對裁切圖檔做 extract_lineid_phone
+        phone, lineid_result, text, similar_id_func = extract_lineid_phone(save_path, debug=True)
+        print(f"手機：{phone}")
+        if isinstance(lineid_result, list):
+            print("請選擇正確的 LINE ID：")
+            for idx, lid in enumerate(lineid_result, 1):
+                print(f"{idx}. {lid}")
+            user_input = input("請輸入編號選擇：")
+            selected_line_id = lineid_result[int(user_input)-1]
+            print(f"你選擇的 LINE ID 是: {selected_line_id}")
+        else:
+            print(f"LINE ID: {lineid_result}")
+        print("-" * 30)
