@@ -43,24 +43,59 @@ def is_fake_line_id(lineid):
     return False
 
 def similar_id(id1, id2):
-    return normalize_text(id1).lower() == normalize_text(id2).lower()
+    """
+    智慧比對 LINE ID，容許 O/0、S/5、I/1、l/1 混用
+    """
+    def normalize_for_compare(s):
+        s = normalize_text(s).lower()
+        # 全部都轉成英數最常見型態
+        s = s.replace('0', 'o')
+        s = s.replace('1', 'l')
+        s = s.replace('5', 's')
+        s = s.replace('i', 'l')
+        return s
+    return normalize_for_compare(id1) == normalize_for_compare(id2)
 
 def generate_lineid_candidates(lineid):
     """
-    根據 L/1 混用產生所有可能的 LINE ID 選項，去重。
-    只針對有 L/1 的情境，避免無意義變體。
+    根據 L/1、O/0、S/5、I/1 混用產生所有可能的 LINE ID 選項，去重。
     """
-    candidates = set()
-    candidates.add(lineid)
-    # L -> 1
-    if 'L' in lineid or 'l' in lineid:
-        candidates.add(lineid.replace('L', '1').replace('l', '1'))
-    # 1 -> L
-    if '1' in lineid:
-        candidates.add(lineid.replace('1', 'L'))
-        candidates.add(lineid.replace('1', 'l'))
-    # 你也可根據 O/0 等需求擴充
-    return list(candidates)
+    variants = set()
+    base = lineid
+    variants.add(base)
+
+    # O/0
+    variants.add(base.replace('O', '0').replace('o', '0'))
+    variants.add(base.replace('0', 'O').replace('0', 'o'))
+
+    # l/1
+    variants.add(base.replace('l', '1'))
+    variants.add(base.replace('1', 'l'))
+
+    # S/5
+    variants.add(base.replace('S', '5').replace('s', '5'))
+    variants.add(base.replace('5', 'S').replace('5', 's'))
+
+    # I/1
+    variants.add(base.replace('I', '1').replace('i', '1'))
+    variants.add(base.replace('1', 'I').replace('1', 'i'))
+
+    # 排列組合（只產生一層，避免無限）
+    more = set()
+    for v in list(variants):
+        more.add(v.replace('O', '0').replace('o', '0'))
+        more.add(v.replace('0', 'O').replace('0', 'o'))
+        more.add(v.replace('l', '1'))
+        more.add(v.replace('1', 'l'))
+        more.add(v.replace('S', '5').replace('s', '5'))
+        more.add(v.replace('5', 'S').replace('5', 's'))
+        more.add(v.replace('I', '1').replace('i', '1'))
+        more.add(v.replace('1', 'I').replace('1', 'i'))
+    variants.update(more)
+
+    # 去掉明顯 fake
+    variants = {v for v in variants if v and not is_fake_line_id(v)}
+    return list(variants)
 
 def extract_lineid_phone(image_path, debug=False):
     image = preprocess_image(image_path)
@@ -125,7 +160,7 @@ def extract_lineid_phone(image_path, debug=False):
 # --- CLI互動範例 ---
 if __name__ == "__main__":
     img_path = input("請輸入圖片路徑：")
-    phone, lineid_result, text, similar_id = extract_lineid_phone(img_path, debug=True)
+    phone, lineid_result, text, similar_id_func = extract_lineid_phone(img_path, debug=True)
     print(f"【圖片偵測結果】\n手機:{phone}")
     # 如果有多個候選，讓用戶選擇
     if isinstance(lineid_result, list):
