@@ -48,7 +48,6 @@ def similar_id(id1, id2):
     """
     def normalize_for_compare(s):
         s = normalize_text(s).lower()
-        # 全部都轉成英數最常見型態
         s = s.replace('0', 'o')
         s = s.replace('1', 'l')
         s = s.replace('5', 's')
@@ -63,23 +62,18 @@ def generate_lineid_candidates(lineid):
     variants = set()
     base = lineid
     variants.add(base)
-
     # O/0
     variants.add(base.replace('O', '0').replace('o', '0'))
     variants.add(base.replace('0', 'O').replace('0', 'o'))
-
     # l/1
     variants.add(base.replace('l', '1'))
     variants.add(base.replace('1', 'l'))
-
     # S/5
     variants.add(base.replace('S', '5').replace('s', '5'))
     variants.add(base.replace('5', 'S').replace('5', 's'))
-
     # I/1
     variants.add(base.replace('I', '1').replace('i', '1'))
     variants.add(base.replace('1', 'I').replace('1', 'i'))
-
     # 排列組合（只產生一層，避免無限）
     more = set()
     for v in list(variants):
@@ -92,10 +86,45 @@ def generate_lineid_candidates(lineid):
         more.add(v.replace('I', '1').replace('i', '1'))
         more.add(v.replace('1', 'I').replace('1', 'i'))
     variants.update(more)
-
     # 去掉明顯 fake
     variants = {v for v in variants if v and not is_fake_line_id(v)}
     return list(variants)
+
+def detect_profile_type(image_path):
+    """
+    根據「個人檔案」座標自動判斷 iOS 或 Android
+    """
+    image = Image.open(image_path)
+    data = pytesseract.image_to_data(image, lang='chi_tra+eng', output_type=pytesseract.Output.DICT)
+    n_boxes = len(data['level'])
+    for i in range(n_boxes):
+        if data['text'][i] == "個人檔案":
+            x, y, w, h = data['left'][i], data['top'][i], data['width'][i], data['height'][i]
+            img_w, img_h = image.size
+            x_center = x + w / 2
+            # 上方（前15%）
+            is_top = y < (img_h * 0.15)
+            # 中間（左右35%-65%）
+            is_center = (img_w * 0.35) < x_center < (img_w * 0.65)
+            # 左側（左20%）
+            is_left = x_center < (img_w * 0.2)
+            if is_top and is_center:
+                return "iOS"
+            elif is_top and is_left:
+                return "Android"
+    return "Unknown"
+
+def specialize_ios(image):
+    # 這裡填寫 iOS 圖片的特化處理
+    print("執行iOS特化處理")
+    # 例如：可加入 iOS 專用的 OCR 流程或影像增強
+    # ...
+
+def specialize_android(image):
+    # 這裡填寫 Android 圖片的特化處理
+    print("執行Android特化處理")
+    # 例如：可加入 Android 專用的 OCR 流程或影像增強
+    # ...
 
 def extract_lineid_phone(image_path, debug=False):
     image = preprocess_image(image_path)
@@ -112,7 +141,6 @@ def extract_lineid_phone(image_path, debug=False):
         candidate = lineid_match.group(1).strip()
         if candidate and not is_fake_line_id(candidate):
             line_id = candidate
-
     for i, word in enumerate(words):
         if isinstance(word, str) and word and re.match(r'^ID$', word, re.IGNORECASE):
             next_words = []
@@ -129,26 +157,22 @@ def extract_lineid_phone(image_path, debug=False):
                 if candidate and not is_fake_line_id(candidate):
                     line_id = candidate
                     break
-
     if not line_id:
         lineid_match = re.search(r'ID\s*:?[\s\n]*([^\s]+)', text, re.IGNORECASE)
         if lineid_match:
             candidate = re.split(r'(複製|コピー|Copy)', lineid_match.group(1))[0].strip()
             if candidate and not is_fake_line_id(candidate):
                 line_id = candidate
-
     # 產生候選清單
     line_id_candidates = []
     if line_id:
         line_id_candidates = generate_lineid_candidates(line_id)
         line_id_candidates = [c for c in line_id_candidates if not is_fake_line_id(c)]
         line_id_candidates = list(set(line_id_candidates))
-
     if debug:
         print("OCR全文：", text)
         print("image_to_data：", words)
         print("抓到ID候選：", line_id_candidates)
-
     # 回傳時
     if len(line_id_candidates) > 1:
         return phone, line_id_candidates, text, similar_id
@@ -157,12 +181,19 @@ def extract_lineid_phone(image_path, debug=False):
     else:
         return phone, None, text, similar_id
 
-# --- CLI互動範例 ---
 if __name__ == "__main__":
     img_path = input("請輸入圖片路徑：")
+    device_type = detect_profile_type(img_path)
+    print("裝置判斷結果：", device_type)
+    img = Image.open(img_path)
+    if device_type == 'iOS':
+        specialize_ios(img)
+    elif device_type == 'Android':
+        specialize_android(img)
+    else:
+        print("無法判斷裝置型態")
     phone, lineid_result, text, similar_id_func = extract_lineid_phone(img_path, debug=True)
     print(f"【圖片偵測結果】\n手機:{phone}")
-    # 如果有多個候選，讓用戶選擇
     if isinstance(lineid_result, list):
         print("請選擇正確的 LINE ID：")
         for idx, lid in enumerate(lineid_result, 1):
