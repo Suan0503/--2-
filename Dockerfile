@@ -1,9 +1,11 @@
 FROM python:3.11-slim
 
-# 安裝 Tesseract-OCR 及中文字庫、其它依賴
+# 安裝 Tesseract-OCR、中文字庫、OpenCV 依賴（libGL）及其它依賴
 RUN apt-get update && \
-    apt-get install -y gcc build-essential libffi-dev tesseract-ocr tesseract-ocr-chi-tra && \
-    rm -rf /var/lib/apt/lists/*
+    apt-get install -y gcc build-essential libffi-dev \
+    tesseract-ocr tesseract-ocr-chi-tra \
+    libgl1-mesa-glx \
+    && rm -rf /var/lib/apt/lists/*
 
 # 建立工作資料夾
 WORKDIR /app
