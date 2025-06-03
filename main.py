@@ -32,8 +32,8 @@ handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
 # 請在這裡加入你的管理員 LINE USER_ID，可以多個
 ADMIN_IDS = [
-    "你的LINE_USER_ID1",
-    # "你的LINE_USER_ID2",
+    "U2bcd63000805da076721eb62872bc39f",
+    "U5ce6c382d12eaea28d98f2d48673b4b8",
     # "其他管理員ID..."
 ]
 
