@@ -11,6 +11,8 @@ import os
 import re
 import traceback
 import pytz
+import random
+import string
 
 from draw_utils import draw_coupon, get_today_coupon_flex, has_drawn_today, save_coupon_record
 from image_verification import extract_lineid_phone
@@ -28,7 +30,18 @@ LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET")
 line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
+# 請在這裡加入你的管理員 LINE USER_ID，可以多個
+ADMIN_IDS = [
+    "你的LINE_USER_ID1",
+    # "你的LINE_USER_ID2",
+    # "其他管理員ID..."
+]
+
 temp_users = {}
+
+manual_verify_pending = {}  # code: {name, line_id, phone, step}
+def generate_verify_code(length=8):
+    return ''.join(random.choices(string.ascii_letters + string.digits, k=length))
 
 class Whitelist(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -161,6 +174,91 @@ def handle_message(event):
     profile = line_bot_api.get_profile(user_id)
     display_name = profile.display_name
 
+    # === 手動驗證 - 僅限管理員 ===
+    if user_text.startswith("手動驗證 - "):
+        if user_id not in ADMIN_IDS:
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 只有管理員可使用此功能"))
+            return
+        parts = user_text.split(" - ", 1)
+        if len(parts) == 2:
+            temp_users[user_id] = {"manual_step": "wait_lineid", "name": parts[1]}
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="請輸入該用戶的 LINE ID"))
+        else:
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="格式錯誤，請用：手動驗證 - 暱稱"))
+        return
+    if user_id in temp_users and temp_users[user_id].get("manual_step") == "wait_lineid":
+        temp_users[user_id]['line_id'] = user_text
+        temp_users[user_id]['manual_step'] = "wait_phone"
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text="請輸入該用戶的手機號碼"))
+        return
+    if user_id in temp_users and temp_users[user_id].get("manual_step") == "wait_phone":
+        temp_users[user_id]['phone'] = user_text
+        code = generate_verify_code()
+        manual_verify_pending[code] = {
+            'name': temp_users[user_id]['name'],
+            'line_id': temp_users[user_id]['line_id'],
+            'phone': temp_users[user_id]['phone'],
+            'step': 'wait_user_input'
+        }
+        del temp_users[user_id]
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"驗證碼產生：{code}\n請把此驗證碼給用戶，讓他輸入：手動驗證"))
+        return
+
+    # 用戶端流程
+    if user_text == "手動驗證":
+        temp_users[user_id] = {"manual_step": "wait_code"}
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text="請輸入管理員給你的8位驗證碼"))
+        return
+    if user_id in temp_users and temp_users[user_id].get("manual_step") == "wait_code" and len(user_text) == 8:
+        code = user_text
+        record = manual_verify_pending.get(code)
+        if not record:
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="驗證碼錯誤或已過期，請洽管理員"))
+            return
+        temp_users[user_id] = {
+            "manual_step": "wait_confirm",
+            "name": record['name'],
+            "line_id": record['line_id'],
+            "phone": record['phone'],
+            "verify_code": code
+        }
+        reply = (
+            f"📱 由管理員手動輸入\n"
+            f"🌸 暱稱：{record['name']}\n"
+            f"       個人編號：待驗證後產生\n"
+            f"🔗 LINE ID：{record['line_id']}\n"
+            f"（此用戶為手動通過）\n"
+            f"請問以上資料是否正確？正確請回復 1\n"
+            f"⚠️輸入錯誤請從新輸入手機號碼即可⚠️"
+        )
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
+        return
+    if user_id in temp_users and temp_users[user_id].get("manual_step") == "wait_confirm" and user_text == "1":
+        data = temp_users[user_id]
+        now = datetime.now(tz)
+        new_user = Whitelist(
+            phone=data['phone'],
+            name=data['name'],
+            line_id=data['line_id'],
+            date=now.strftime("%Y-%m-%d"),
+            created_at=now,
+            line_user_id=user_id
+        )
+        db.session.add(new_user)
+        db.session.commit()
+        reply = (
+            f"📱 由管理員手動輸入\n"
+            f"🌸 暱稱：{data['name']}\n"
+            f"       個人編號：{new_user.id}\n"
+            f"🔗 LINE ID：{data['line_id']}\n"
+            f"✅ 驗證成功，歡迎加入茗殿"
+        )
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
+        manual_verify_pending.pop(data['verify_code'], None)
+        temp_users.pop(user_id)
+        return
+
+    # ====== 原有驗證與抽獎功能（以下不變） ======
     if user_text == "手動通過":
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 此功能已關閉"))
         return
@@ -326,7 +424,6 @@ def handle_image(event):
         for chunk in message_content.iter_content():
             fd.write(chunk)
 
-    # 用簡化版 extract_lineid_phone，回傳 phone, lineid, ocr_text
     phone_ocr, lineid_ocr, ocr_text = extract_lineid_phone(image_path)
     input_phone = temp_users[user_id].get("phone")
     input_lineid = temp_users[user_id].get("line_id")
