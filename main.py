@@ -84,7 +84,7 @@ def get_function_menu_flex():
                                 "action": {
                                     "type": "uri",
                                     "label": "📅 每日班表",
-                                    "uri": "https://t.me/+XgwLCJ6kdhhhZDE1"
+                                    "uri": "https://t.me/+EJwLPpVirupiZGI9"
                                 },
                                 "style": "secondary",
                                 "color": "#FFF8B7"
