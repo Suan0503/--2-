@@ -30,7 +30,6 @@ LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET")
 line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
-# 請在這裡加入你的管理員 LINE USER_ID，可以多個
 ADMIN_IDS = [
     "U2bcd63000805da076721eb62872bc39f",
     "U5ce6c382d12eaea28d98f2d48673b4b8",
@@ -174,7 +173,7 @@ def handle_message(event):
     profile = line_bot_api.get_profile(user_id)
     display_name = profile.display_name
 
-    # === 手動驗證 - 新流程 ===
+    # === 手動驗證 - 僅限管理員流程 ===
     if user_text.startswith("手動驗證 - "):
         if user_id not in ADMIN_IDS:
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 只有管理員可使用此功能"))
@@ -205,11 +204,11 @@ def handle_message(event):
         del temp_users[user_id]
         line_bot_api.reply_message(
             event.reply_token,
-            TextSendMessage(text=f"驗證碼產生：{code}\n請直接在聊天室輸入此8位驗證碼")
+            TextSendMessage(text=f"驗證碼產生：{code}\n請將此8位驗證碼提供給用戶或請用戶自行輸入驗證碼")
         )
         return
 
-    # 只要有人輸入正確8位驗證碼就跳出資料確認訊息
+    # 驗證碼（任何人都可輸入，只能用一次）
     if len(user_text) == 8 and user_text in manual_verify_pending:
         record = manual_verify_pending[user_text]
         temp_users[user_id] = {
@@ -229,6 +228,7 @@ def handle_message(event):
             f"⚠️輸入錯誤請從新輸入手機號碼即可⚠️"
         )
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
+        manual_verify_pending.pop(user_text, None)
         return
 
     if user_id in temp_users and temp_users[user_id].get("manual_step") == "wait_confirm" and user_text == "1":
@@ -252,7 +252,6 @@ def handle_message(event):
             f"✅ 驗證成功，歡迎加入茗殿"
         )
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
-        manual_verify_pending.pop(data['verify_code'], None)
         temp_users.pop(user_id)
         return
 
