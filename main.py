@@ -38,8 +38,8 @@ ADMIN_IDS = [
 ]
 
 temp_users = {}
-
 manual_verify_pending = {}  # code: {name, line_id, phone, step}
+
 def generate_verify_code(length=8):
     return ''.join(random.choices(string.ascii_letters + string.digits, k=length))
 
@@ -223,10 +223,9 @@ def handle_message(event):
             "verify_code": code
         }
         reply = (
-            f"📱 由管理員手動輸入\n"
+            f"📱 手機號碼：{record['phone']}\n"
             f"🌸 暱稱：{record['name']}\n"
             f"       個人編號：待驗證後產生\n"
-            f"📱 手機號碼：{record['phone']}\n"
             f"🔗 LINE ID：{record['line_id']}\n"
             f"（此用戶為手動通過）\n"
             f"請問以上資料是否正確？正確請回復 1\n"
@@ -248,10 +247,9 @@ def handle_message(event):
         db.session.add(new_user)
         db.session.commit()
         reply = (
-            f"📱 由管理員手動輸入\n"
+            f"📱 手機號碼：{data['phone']}\n"
             f"🌸 暱稱：{data['name']}\n"
             f"       個人編號：{new_user.id}\n"
-            f"📱 手機號碼：{data['phone']}\n"
             f"🔗 LINE ID：{data['line_id']}\n"
             f"✅ 驗證成功，歡迎加入茗殿"
         )
