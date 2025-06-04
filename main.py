@@ -326,7 +326,9 @@ def handle_message(event):
             event.reply_token,
             [
                 TextSendMessage(text="📱 手機已登記囉～請接著輸入您的 LINE ID"),
-                TextSendMessage(text="（如無 ID 請輸入：尚未設定）\n若手機就是 ID，請開頭輸入ID兩字（ID09XXXXXXXX）")
+                TextSendMessage(text="若您有設定 LINE ID → ✅ 直接輸入即可"),
+                TextSendMessage(text="若尚未設定 ID → 請輸入：「尚未設定」"),
+                TextSendMessage(text="若您的 LINE ID 是手機號碼本身（例如 09xxxxxxxx）→ 請在開頭加上「ID」兩個字")
             ]
         )
         return
