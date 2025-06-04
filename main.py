@@ -174,7 +174,7 @@ def handle_message(event):
     profile = line_bot_api.get_profile(user_id)
     display_name = profile.display_name
 
-    # === 手動驗證 - 僅限管理員 ===
+    # === 手動驗證 - 新流程 ===
     if user_text.startswith("手動驗證 - "):
         if user_id not in ADMIN_IDS:
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 只有管理員可使用此功能"))
@@ -186,11 +186,13 @@ def handle_message(event):
         else:
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="格式錯誤，請用：手動驗證 - 暱稱"))
         return
+
     if user_id in temp_users and temp_users[user_id].get("manual_step") == "wait_lineid":
         temp_users[user_id]['line_id'] = user_text
         temp_users[user_id]['manual_step'] = "wait_phone"
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text="請輸入該用戶的手機號碼"))
         return
+
     if user_id in temp_users and temp_users[user_id].get("manual_step") == "wait_phone":
         temp_users[user_id]['phone'] = user_text
         code = generate_verify_code()
@@ -201,26 +203,21 @@ def handle_message(event):
             'step': 'wait_user_input'
         }
         del temp_users[user_id]
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"驗證碼產生：{code}\n請把此驗證碼給用戶，讓他輸入：手動驗證"))
+        line_bot_api.reply_message(
+            event.reply_token,
+            TextSendMessage(text=f"驗證碼產生：{code}\n請直接在聊天室輸入此8位驗證碼")
+        )
         return
 
-    # 用戶端流程
-    if user_text == "手動驗證":
-        temp_users[user_id] = {"manual_step": "wait_code"}
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text="請輸入管理員給你的8位驗證碼"))
-        return
-    if user_id in temp_users and temp_users[user_id].get("manual_step") == "wait_code" and len(user_text) == 8:
-        code = user_text
-        record = manual_verify_pending.get(code)
-        if not record:
-            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="驗證碼錯誤或已過期，請洽管理員"))
-            return
+    # 只要有人輸入正確8位驗證碼就跳出資料確認訊息
+    if len(user_text) == 8 and user_text in manual_verify_pending:
+        record = manual_verify_pending[user_text]
         temp_users[user_id] = {
             "manual_step": "wait_confirm",
             "name": record['name'],
             "line_id": record['line_id'],
             "phone": record['phone'],
-            "verify_code": code
+            "verify_code": user_text
         }
         reply = (
             f"📱 手機號碼：{record['phone']}\n"
@@ -233,6 +230,7 @@ def handle_message(event):
         )
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
         return
+
     if user_id in temp_users and temp_users[user_id].get("manual_step") == "wait_confirm" and user_text == "1":
         data = temp_users[user_id]
         now = datetime.now(tz)
@@ -259,6 +257,7 @@ def handle_message(event):
         return
 
     # ====== 原有驗證與抽獎功能（以下不變） ======
+
     if user_text == "手動通過":
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 此功能已關閉"))
         return
