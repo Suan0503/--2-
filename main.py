@@ -218,7 +218,7 @@ def handle_message(event):
         del temp_users[user_id]
         line_bot_api.reply_message(
             event.reply_token,
-            TextSendMessage(text=f"驗證碼產生：{code}\n請將此8位驗證碼提供給用戶或請用戶自行輸入驗證碼")
+            TextSendMessage(text=f"驗證碼產生：{code}\n請將此8位驗證碼自行輸入聊天室")
         )
         return
 
