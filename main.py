@@ -20,8 +20,13 @@ from special_case import is_special_case
 
 load_dotenv()
 
+# ===== 資料庫連線字串修正 =====
+DATABASE_URL = os.getenv("DATABASE_URL")
+if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
 app = Flask(__name__)
-app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
+app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db = SQLAlchemy(app)
 
@@ -37,12 +42,13 @@ ADMIN_IDS = [
 ]
 
 temp_users = {}
-manual_verify_pending = {}  # code: {name, line_id, phone, step}
+manual_verify_pending = {}
 
 def generate_verify_code(length=8):
     return ''.join(random.choices(string.ascii_letters + string.digits, k=length))
 
 class Whitelist(db.Model):
+    __tablename__ = "whitelist"
     id = db.Column(db.Integer, primary_key=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     date = db.Column(db.String(20))
@@ -53,6 +59,7 @@ class Whitelist(db.Model):
     line_user_id = db.Column(db.String(255), unique=True)
 
 class Blacklist(db.Model):
+    __tablename__ = "blacklist"
     id = db.Column(db.Integer, primary_key=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     date = db.Column(db.String(20))
@@ -61,6 +68,7 @@ class Blacklist(db.Model):
     name = db.Column(db.String(255))
 
 class Coupon(db.Model):
+    __tablename__ = "coupon"
     id = db.Column(db.Integer, primary_key=True)
     line_user_id = db.Column(db.String(255))
     date = db.Column(db.String(20))
@@ -140,7 +148,12 @@ def choose_link():
 
 @app.route("/")
 def home():
-    return "LINE Bot 正常運作中～🍵"
+    try:
+        db.session.execute("SELECT 1")
+        db_status = "資料庫連線正常"
+    except Exception as e:
+        db_status = "資料庫連線異常: " + str(e)
+    return f"LINE Bot 正常運作中～🍵\n{db_status}"
 
 @app.route("/callback", methods=["POST"])
 def callback():
@@ -243,7 +256,13 @@ def handle_message(event):
             line_user_id=user_id
         )
         db.session.add(new_user)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as e:
+            print("=== 資料庫寫入失敗（手動驗證）===")
+            print(traceback.format_exc())
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="⚠️ 資料庫寫入失敗，請聯絡管理員處理！"))
+            return
         reply = (
             f"📱 手機號碼：{data['phone']}\n"
             f"🌸 暱稱：{data['name']}\n"
@@ -256,7 +275,6 @@ def handle_message(event):
         return
 
     # ====== 原有驗證與抽獎功能（以下不變） ======
-
     if user_text == "手動通過":
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 此功能已關閉"))
         return
@@ -366,7 +384,13 @@ def handle_message(event):
             existing_record.line_user_id = user_id
             existing_record.line_id = data["line_id"]
             existing_record.name = data["name"]
-            db.session.commit()
+            try:
+                db.session.commit()
+            except Exception as e:
+                print("=== 資料庫寫入失敗（自動驗證）===")
+                print(traceback.format_exc())
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(text="⚠️ 資料庫寫入失敗，請聯絡管理員處理！"))
+                return
             saved_id = existing_record.id
             created_time = existing_record.created_at.astimezone(tz).strftime('%Y/%m/%d %H:%M:%S')
         else:
@@ -379,7 +403,13 @@ def handle_message(event):
                 line_user_id=user_id
             )
             db.session.add(new_user)
-            db.session.commit()
+            try:
+                db.session.commit()
+            except Exception as e:
+                print("=== 資料庫寫入失敗（自動驗證-新增）===")
+                print(traceback.format_exc())
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(text="⚠️ 資料庫寫入失敗，請聯絡管理員處理！"))
+                return
             saved_id = new_user.id
             created_time = now.strftime('%Y/%m/%d %H:%M:%S')
 
