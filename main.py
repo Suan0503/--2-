@@ -170,6 +170,47 @@ def callback():
         abort(500)
     return "OK"
 
+# ----------- 新增：覆蓋邏輯 function -----------
+def update_or_create_whitelist_from_data(data, user_id=None):
+    """
+    如果phone重複，直接覆蓋現有資料（只補空欄位），沒有則新增。
+    """
+    existing = Whitelist.query.filter_by(phone=data["phone"]).first()
+    need_commit = False
+    if existing:
+        # 只補空的欄位
+        if data.get("name") and (not existing.name):
+            existing.name = data["name"]
+            need_commit = True
+        if data.get("line_id") and (not existing.line_id):
+            existing.line_id = data["line_id"]
+            need_commit = True
+        if user_id and (not existing.line_user_id):
+            existing.line_user_id = user_id
+            need_commit = True
+        if data.get("reason") and (not existing.reason):
+            existing.reason = data["reason"]
+            need_commit = True
+        if data.get("date") and (not existing.date):
+            existing.date = data["date"]
+            need_commit = True
+        if need_commit:
+            db.session.commit()
+        return existing, False  # False 代表是覆蓋
+    else:
+        new_user = Whitelist(
+            phone=data["phone"],
+            name=data.get("name"),
+            line_id=data.get("line_id"),
+            line_user_id=user_id if user_id else data.get("line_user_id"),
+            reason=data.get("reason"),
+            date=data.get("date"),
+            created_at=datetime.utcnow()
+        )
+        db.session.add(new_user)
+        db.session.commit()
+        return new_user, True  # True 代表是新創
+
 @handler.add(FollowEvent)
 def handle_follow(event):
     msg = (
@@ -248,29 +289,24 @@ def handle_message(event):
     if user_id in temp_users and temp_users[user_id].get("manual_step") == "wait_confirm" and user_text == "1":
         data = temp_users[user_id]
         now = datetime.now(tz)
-        new_user = Whitelist(
-            phone=data['phone'],
-            name=data['name'],
-            line_id=data['line_id'],
-            date=now.strftime("%Y-%m-%d"),
-            created_at=now,
-            line_user_id=user_id
-        )
-        db.session.add(new_user)
-        try:
-            db.session.commit()
-        except Exception as e:
-            print("=== 資料庫寫入失敗（手動驗證）===")
-            print(traceback.format_exc())
-            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="⚠️ 資料庫寫入失敗，請聯絡管理員處理！"))
-            return
-        reply = (
-            f"📱 手機號碼：{data['phone']}\n"
-            f"🌸 暱稱：{data['name']}\n"
-            f"       個人編號：{new_user.id}\n"
-            f"🔗 LINE ID：{data['line_id']}\n"
-            f"✅ 驗證成功，歡迎加入茗殿"
-        )
+        data["date"] = now.strftime("%Y-%m-%d")
+        record, is_new = update_or_create_whitelist_from_data(data, user_id)
+        if is_new:
+            reply = (
+                f"📱 手機號碼：{data['phone']}\n"
+                f"🌸 暱稱：{data['name']}\n"
+                f"       個人編號：{record.id}\n"
+                f"🔗 LINE ID：{data['line_id']}\n"
+                f"✅ 驗證成功，歡迎加入茗殿"
+            )
+        else:
+            reply = (
+                f"📱 手機號碼：{record.phone}\n"
+                f"🌸 暱稱：{record.name or data.get('name')}\n"
+                f"       個人編號：{record.id}\n"
+                f"🔗 LINE ID：{record.line_id or data.get('line_id')}\n"
+                f"✅ 你的資料已補全，歡迎加入茗殿"
+            )
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply))
         temp_users.pop(user_id)
         return
@@ -283,6 +319,7 @@ def handle_message(event):
     if user_text == "驗證資訊":
         existing = Whitelist.query.filter_by(line_user_id=user_id).first()
         if existing:
+            tz = pytz.timezone("Asia/Taipei")
             reply = (
                 f"📱 {existing.phone}\n"
                 f"🌸 暱稱：{existing.name or display_name}\n"
@@ -313,6 +350,7 @@ def handle_message(event):
     existing = Whitelist.query.filter_by(line_user_id=user_id).first()
     if existing:
         if user_text == existing.phone:
+            tz = pytz.timezone("Asia/Taipei")
             reply = (
                 f"📱 {existing.phone}\n"
                 f"🌸 暱稱：{existing.name or display_name}\n"
@@ -332,10 +370,13 @@ def handle_message(event):
         if black:
             return
         repeated = Whitelist.query.filter_by(phone=user_text).first()
+        data = {"phone": user_text, "name": display_name}
         if repeated and repeated.line_user_id:
+            # 直接補資料（只補空欄位）
+            update_or_create_whitelist_from_data(data)
             line_bot_api.reply_message(
                 event.reply_token,
-                TextSendMessage(text="⚠️ 此手機號碼已被使用，請輸入正確的手機號碼")
+                TextSendMessage(text="⚠️ 此手機號碼已被使用，已補全缺失資料。")
             )
             return
         temp_users[user_id] = {"phone": user_text, "name": display_name, "step": "waiting_lineid"}
@@ -378,49 +419,28 @@ def handle_message(event):
     if user_text == "1" and user_id in temp_users and temp_users[user_id].get("step") == "waiting_confirm":
         data = temp_users[user_id]
         now = datetime.now(tz)
-        existing_record = Whitelist.query.filter_by(phone=data["phone"]).first()
-        if existing_record:
-            existing_record.line_user_id = user_id
-            existing_record.line_id = data["line_id"]
-            existing_record.name = data["name"]
-            try:
-                db.session.commit()
-            except Exception as e:
-                print("=== 資料庫寫入失敗（自動驗證）===")
-                print(traceback.format_exc())
-                line_bot_api.reply_message(event.reply_token, TextSendMessage(text="⚠️ 資料庫寫入失敗，請聯絡管理員處理！"))
-                return
-            saved_id = existing_record.id
-            created_time = existing_record.created_at.astimezone(tz).strftime('%Y/%m/%d %H:%M:%S')
-        else:
-            new_user = Whitelist(
-                phone=data["phone"],
-                name=data["name"],
-                line_id=data["line_id"],
-                date=now.strftime("%Y-%m-%d"),
-                created_at=now,
-                line_user_id=user_id
+        data["date"] = now.strftime("%Y-%m-%d")
+        record, is_new = update_or_create_whitelist_from_data(data, user_id)
+        if is_new:
+            reply = (
+                f"📱 {data['phone']}\n"
+                f"🌸 暱稱：{data['name']}\n"
+                f"       個人編號：{record.id}\n"
+                f"🔗 LINE ID：{data['line_id']}\n"
+                f"🕒 {record.created_at.astimezone(tz).strftime('%Y/%m/%d %H:%M:%S')}\n"
+                f"✅ 驗證成功，歡迎加入茗殿\n"
+                f"🌟 加入密碼：ming666"
             )
-            db.session.add(new_user)
-            try:
-                db.session.commit()
-            except Exception as e:
-                print("=== 資料庫寫入失敗（自動驗證-新增）===")
-                print(traceback.format_exc())
-                line_bot_api.reply_message(event.reply_token, TextSendMessage(text="⚠️ 資料庫寫入失敗，請聯絡管理員處理！"))
-                return
-            saved_id = new_user.id
-            created_time = now.strftime('%Y/%m/%d %H:%M:%S')
-
-        reply = (
-            f"📱 {data['phone']}\n"
-            f"🌸 暱稱：{data['name']}\n"
-            f"       個人編號：{saved_id}\n"
-            f"🔗 LINE ID：{data['line_id']}\n"
-            f"🕒 {created_time}\n"
-            f"✅ 驗證成功，歡迎加入茗殿\n"
-            f"🌟 加入密碼：ming666"
-        )
+        else:
+            reply = (
+                f"📱 {record.phone}\n"
+                f"🌸 暱稱：{record.name or data.get('name')}\n"
+                f"       個人編號：{record.id}\n"
+                f"🔗 LINE ID：{record.line_id or data.get('line_id')}\n"
+                f"🕒 {record.created_at.astimezone(tz).strftime('%Y/%m/%d %H:%M:%S')}\n"
+                f"✅ 你的資料已補全，歡迎加入茗殿\n"
+                f"🌟 加入密碼：ming666"
+            )
         line_bot_api.reply_message(event.reply_token, [TextSendMessage(text=reply), get_function_menu_flex()])
         temp_users.pop(user_id)
         return
