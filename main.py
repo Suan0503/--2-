@@ -147,6 +147,15 @@ def choose_link():
     ]
     return group[hash(os.urandom(8)) % len(group)]
 
+def normalize_phone(phone):
+    """將手機號碼轉為09開頭格式"""
+    phone = (phone or "").replace(" ", "").replace("-", "")
+    if phone.startswith("+8869"):
+        return "0" + phone[4:]
+    if phone.startswith("+886"):
+        return "0" + phone[4:]
+    return phone
+
 @app.route("/")
 def home():
     try:
@@ -170,7 +179,6 @@ def callback():
         abort(500)
     return "OK"
 
-# ----------- 新增：覆蓋邏輯 function -----------
 def update_or_create_whitelist_from_data(data, user_id=None):
     """
     如果phone重複，直接覆蓋現有資料（只補空欄位），沒有則新增。
@@ -293,7 +301,7 @@ def handle_message(event):
         record, is_new = update_or_create_whitelist_from_data(data, user_id)
         if is_new:
             reply = (
-                f"📱 手機號碼：{data['phone']}\n"
+                f"📱 {data['phone']}\n"
                 f"🌸 暱稱：{data['name']}\n"
                 f"       個人編號：{record.id}\n"
                 f"🔗 LINE ID：{data['line_id']}\n"
@@ -311,11 +319,7 @@ def handle_message(event):
         temp_users.pop(user_id)
         return
 
-    # ====== 原有驗證與抽獎功能（以下不變） ======
-    if user_text == "手動通過":
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 此功能已關閉"))
-        return
-
+    # ====== 驗證資訊查詢 ======
     if user_text == "驗證資訊":
         existing = Whitelist.query.filter_by(line_user_id=user_id).first()
         if existing:
@@ -334,7 +338,13 @@ def handle_message(event):
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="⚠️ 你尚未完成驗證，請輸入手機號碼進行驗證。"))
         return
 
+    # ====== 每日抽獎，需驗證才能抽 ======
     if user_text == "每日抽獎":
+        # 先檢查是否已驗證（在白名單）
+        verified = Whitelist.query.filter_by(line_user_id=user_id).first()
+        if not verified:
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="⚠️ 你尚未完成驗證，請先完成驗證才能參加每日抽獎！"))
+            return
         today_str = datetime.now(tz).strftime("%Y-%m-%d")
         if has_drawn_today(user_id, Coupon):
             coupon = Coupon.query.filter_by(line_user_id=user_id, date=today_str).first()
@@ -347,6 +357,7 @@ def handle_message(event):
         line_bot_api.reply_message(event.reply_token, flex)
         return
 
+    # ====== 查詢現有白名單（手機查詢驗證） ======
     existing = Whitelist.query.filter_by(line_user_id=user_id).first()
     if existing:
         if user_text == existing.phone:
@@ -365,6 +376,7 @@ def handle_message(event):
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="⚠️ 你已驗證完成，請輸入手機號碼查看驗證資訊"))
         return
 
+    # ====== 手機號碼啟動驗證流程 ======
     if re.match(r"^09\d{8}$", user_text):
         black = Blacklist.query.filter_by(phone=user_text).first()
         if black:
@@ -372,7 +384,6 @@ def handle_message(event):
         repeated = Whitelist.query.filter_by(phone=user_text).first()
         data = {"phone": user_text, "name": display_name}
         if repeated and repeated.line_user_id:
-            # 直接補資料（只補空欄位）
             update_or_create_whitelist_from_data(data)
             line_bot_api.reply_message(
                 event.reply_token,
@@ -389,6 +400,7 @@ def handle_message(event):
         )
         return
 
+    # ====== 輸入 LINE ID ======
     if user_id in temp_users and temp_users[user_id].get("step", "waiting_lineid") == "waiting_lineid" and len(user_text) >= 2:
         record = temp_users[user_id]
         input_lineid = user_text.strip()
@@ -416,6 +428,7 @@ def handle_message(event):
         )
         return
 
+    # ====== 驗證確認 ======
     if user_text == "1" and user_id in temp_users and temp_users[user_id].get("step") == "waiting_confirm":
         data = temp_users[user_id]
         now = datetime.now(tz)
@@ -477,6 +490,28 @@ def handle_image(event):
     input_phone = temp_users[user_id].get("phone")
     input_lineid = temp_users[user_id].get("line_id")
     record = temp_users[user_id]
+
+    # ====== OCR與手動輸入完全吻合則自動通關 ======
+    if (
+        phone_ocr and lineid_ocr
+        and normalize_phone(phone_ocr) == normalize_phone(input_phone)
+        and input_lineid is not None and lineid_ocr.lower() == input_lineid.lower()
+    ):
+        now = datetime.now(pytz.timezone("Asia/Taipei"))
+        record["date"] = now.strftime("%Y-%m-%d")
+        whitelist_record, is_new = update_or_create_whitelist_from_data(record, user_id)
+        reply = (
+            f"📱 {record['phone']}\n"
+            f"🌸 暱稱：{record['name']}\n"
+            f"       個人編號：{whitelist_record.id}\n"
+            f"🔗 LINE ID：{record['line_id']}\n"
+            f"🕒 {whitelist_record.created_at.astimezone(pytz.timezone('Asia/Taipei')).strftime('%Y/%m/%d %H:%M:%S')}\n"
+            f"✅ 驗證成功，歡迎加入茗殿\n"
+            f"🌟 加入密碼：ming666"
+        )
+        line_bot_api.reply_message(event.reply_token, [TextSendMessage(text=reply), get_function_menu_flex()])
+        temp_users.pop(user_id, None)
+        return
 
     if input_lineid == "尚未設定":
         if phone_ocr == input_phone:
