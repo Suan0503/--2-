@@ -142,7 +142,7 @@ def get_function_menu_flex():
 def choose_link():
     group = [
         "https://line.me/ti/p/g7TPO_lhAL",
-        "https://line.me/ti/p/Q6-jrvhXbH",
+        "https://line.me/ti/p/emkjaMQkMK",
         "https://line.me/ti/p/AKRUvSCLRC"
     ]
     return group[hash(os.urandom(8)) % len(group)]
