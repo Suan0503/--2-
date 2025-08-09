@@ -20,7 +20,13 @@ def guard_verified(event, line_bot_api):
     if not is_verified(user_id):
         line_bot_api.reply_message(
             event.reply_token,
-            TextSendMessage(text="請先完成手機驗證才能使用此功能！")
+            TextSendMessage(
+                text=(
+                    "⚠️ 你尚未完成驗證，請輸入手機號碼進行驗證。\n\n"
+                    "請於聊天視窗輸入您的手機號碼（例：0912345678），"
+                    "將會收到驗證流程指示。"
+                )
+            )
         )
         return False
     return True
