@@ -57,12 +57,17 @@ JKF_LINKS = [
 
 def get_ad_menu():
     """
-    廣告專區 Flex Message，10個JKF連結按鈕（名稱可獨立修改）
+    廣告專區 Flex Message，深色夏日風格
     """
     buttons = []
-    # 柔和海灘色系
-    btn_primary = "#50B7C1"   # 柔綠藍
-    btn_secondary = "#E3F6FC" # 柔米白
+    # 深色夏夜風格色票
+    btn_primary = "#2C4A6B"   # 深藍
+    btn_secondary = "#1E3044" # 更深藍
+    btn_gold = "#FFD700"      # 金黃
+    btn_orange = "#FF9800"    # 橘
+    btn_green = "#11806A"     # 深夏綠
+    btn_gray = "#31485C"      # 深灰藍
+
     for i, link in enumerate(JKF_LINKS):
         buttons.append({
             "type": "button",
@@ -74,7 +79,7 @@ def get_ad_menu():
             "style": "primary" if i % 2 == 0 else "secondary",
             "color": btn_primary if i % 2 == 0 else btn_secondary
         })
-    # 這裡新增一個回主選單的按鈕
+    # 回主選單按鈕
     buttons.append({
         "type": "button",
         "action": {
@@ -82,8 +87,8 @@ def get_ad_menu():
             "label": "🏠 回主選單",
             "text": "主選單"
         },
-        "style": "secondary",
-        "color": "#FFE5A7"  # 柔沙色，可與主選單一致
+        "style": "primary",
+        "color": btn_gold
     })
     return FlexSendMessage(
         alt_text="廣告專區",
@@ -93,10 +98,17 @@ def get_ad_menu():
                 "type": "box",
                 "layout": "vertical",
                 "spacing": "md",
-                "backgroundColor": "#F0FAFF",  # 柔和海灘藍白
+                "backgroundColor": "#1C2636",  # 深夏夜藍
                 "contents": [
-                    {"type": "text", "text": "🏖️ 夏日廣告專區", "weight": "bold", "size": "lg", "align": "center", "color": "#358597"},
-                    {"type": "separator"},
+                    {
+                        "type": "text",
+                        "text": "🏖️ 夏日廣告專區",
+                        "weight": "bold",
+                        "size": "lg",
+                        "align": "center",
+                        "color": "#FFD700"    # 金黃
+                    },
+                    {"type": "separator", "color": "#31485C"},
                     {
                         "type": "box",
                         "layout": "vertical",
@@ -108,23 +120,23 @@ def get_ad_menu():
             }
         }
     )
-    
+
 def get_menu_carousel():
     """
-    主功能選單，夏日海灘柔和風格，按鈕順序已依需求調整
+    主功能選單，深色夏日風格
     """
-    # 柔和色系
-    main_bg1 = "#E7F6F2"     # 柔和藍綠
-    main_bg2 = "#FFF7E3"     # 柔和米黃
-    btn_yellow = "#FFE5A7"   # 柔沙
-    btn_green = "#A7DED9"    # 海灘綠
-    btn_blue = "#50B7C1"     # 柔綠藍
+    # 深色夏夜色系
+    main_bg1 = "#1C2636"     # 深夏夜藍
+    main_bg2 = "#222E44"     # 次深夜藍
+    btn_yellow = "#FFD700"   # 金黃
+    btn_green = "#11806A"    # 深夏綠
+    btn_blue = "#2C4A6B"     # 深藍
     btn_white = "#FDF6EE"    # 柔米白
-    btn_orange = "#FFD6B0"   # 柔橘沙
-    btn_pink = "#FFD1DC"     # 柔粉
-    btn_lblue = "#C2E9FB"    # 柔天藍
-    btn_lgreen = "#D9F9D9"   # 柔綠
-    btn_gray = "#F0FAFF"     # 柔灰藍
+    btn_orange = "#FF9800"   # 橘色
+    btn_pink = "#D97092"     # 夏夜玫瑰粉
+    btn_lblue = "#4B99C2"    # 深天藍
+    btn_lgreen = "#2BB673"   # 夏夜綠
+    btn_gray = "#31485C"     # 深灰藍
 
     bubbles = []
 
@@ -144,9 +156,9 @@ def get_menu_carousel():
                     "weight": "bold",
                     "size": "lg",
                     "align": "center",
-                    "color": "#358597"
+                    "color": "#FFD700"
                 },
-                {"type": "separator"},
+                {"type": "separator", "color": "#31485C"},
                 {
                     "type": "box",
                     "layout": "vertical",
@@ -225,9 +237,9 @@ def get_menu_carousel():
                     "weight": "bold",
                     "size": "lg",
                     "align": "center",
-                    "color": "#F6A500"
+                    "color": "#FFD700"
                 },
-                {"type": "separator"},
+                {"type": "separator", "color": "#31485C"},
                 {
                     "type": "box",
                     "layout": "vertical",
@@ -282,7 +294,7 @@ def get_menu_carousel():
                                 "text": "活動快訊"
                             },
                             "style": "primary",
-                            "color": btn_blue
+                            "color": btn_orange
                         }
                     ]
                 }
