@@ -47,11 +47,34 @@ def handle_report(event):
                 TextSendMessage(text="請輸入正確的網址格式（必須以 http:// 或 https:// 開頭）\n如需取消，請輸入「取消」")
             )
             return
+        
+        # === 雙重驗證機制開始 ===
+        # 1. 查詢所有已通過的回報文（Coupon type="report"）有沒有相同網址
+        existing_coupon = Coupon.query.filter_by(type="report", status="approved", url=url).first()
+        if existing_coupon:
+            line_bot_api.reply_message(
+                event.reply_token,
+                TextSendMessage(text=f"此回報文已被回報 回報ID為：{existing_coupon.report_no or existing_coupon.ticket_code or '未知'}")
+            )
+            temp_users.pop(user_id, None)
+            return
+        # 2. 查詢目前待審核中的回報文（尚未通過但送審中的）
+        for pending_id, pending in report_pending_map.items():
+            if pending.get("url") == url:
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    TextSendMessage(text=f"此回報文已被回報（待審核中） 回報ID為：{pending.get('report_no', '待審核')}")
+                )
+                temp_users.pop(user_id, None)
+                return
+        # === 雙重驗證機制結束 ===
+
         wl = Whitelist.query.filter_by(line_user_id=user_id).first()
         user_number = wl.id if wl else ""
         user_lineid = wl.line_id if wl else ""
+        # 產生全系統唯一流水號，直接用於資料庫和推播
         last_coupon = Coupon.query.filter(Coupon.report_no != None).order_by(Coupon.id.desc()).first()
-        if last_coupon and last_coupon.report_no and last_coupon.report_no.isdigit():
+        if last_coupon and last_coupon.report_no and str(last_coupon.report_no).isdigit():
             report_no = int(last_coupon.report_no) + 1
         else:
             report_no = 1
@@ -127,21 +150,29 @@ def handle_report_postback(event):
         if info:
             to_user_id = info["user_id"]
             report_no = info.get("report_no", "未知")
-            reply = f"🟢 您的回報文已審核通過，獲得一張月底抽獎券！（編號：{report_no}）"
+            tz = pytz.timezone("Asia/Taipei")
+            today = datetime.now(tz).strftime("%Y-%m-%d")
             try:
-                tz = pytz.timezone("Asia/Taipei")
-                today = datetime.now(tz).strftime("%Y-%m-%d")
-                # 回報文寫入 coupon.amount=0, type="report"（預設0，只有中獎才會改成大於0）
+                # 發券時直接寫入與推播同一個 report_no
                 new_coupon = Coupon(
                     line_user_id=to_user_id,
-                    amount=0,  # ← 修改為 0
-                    date=today,
+                    nickname=info.get("display_name"),
+                    member_id=info.get("user_number"),
+                    line_id=info.get("user_lineid"),
+                    url=info.get("url"),
+                    status="approved",
                     created_at=datetime.now(tz),
+                    approved_at=datetime.now(tz),
+                    approved_by=user_id,
+                    ticket_code=report_no,
                     report_no=report_no,
-                    type="report"
+                    type="report",
+                    amount=0,
+                    date=today
                 )
                 db.session.add(new_coupon)
                 db.session.commit()
+                reply = f"🟢 您的回報文已審核通過，獲得一張月底抽獎券！（編號：{report_no}）"
                 line_bot_api.push_message(to_user_id, TextSendMessage(text=reply))
             except Exception as e:
                 print("推播用戶通過回報文失敗", e)
