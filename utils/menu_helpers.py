@@ -255,7 +255,7 @@ def get_menu_carousel():
                             "type": "button",
                             "action": {
                                 "type": "message",
-                                "label": "📝 回報文登記",
+                                "label": "📝 回報文登記(暫停使用)",
                                 "text": "回報文"
                             },
                             "style": "primary",
@@ -275,7 +275,7 @@ def get_menu_carousel():
                             "type": "button",
                             "action": {
                                 "type": "message",
-                                "label": "🧊 呼叫管理員",
+                                "label": "🧊 呼叫管理員（暫停使用）",
                                 "text": "呼叫管理員"
                             },
                             "style": "secondary",
@@ -285,7 +285,7 @@ def get_menu_carousel():
                             "type": "button",
                             "action": {
                                 "type": "message",
-                                "label": "🌞 活動快訊",
+                                "label": "🌞 活動快訊（暫停使用）",
                                 "text": "活動快訊"
                             },
                             "style": "primary",
