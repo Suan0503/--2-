@@ -3,12 +3,19 @@ from extensions import line_bot_api, db
 from models import Whitelist, Coupon
 from utils.menu import get_menu_carousel
 from utils.draw_utils import draw_coupon, get_today_coupon_flex, has_drawn_today, save_coupon_record
+from utils.verify_guard import guard_verified
 import pytz
 from datetime import datetime
 
 def handle_menu(event):
+    # ▼ 新增驗證守門，只要不是驗證資訊或輸入手機號碼就攔住未驗證者 ▼
     user_id = event.source.user_id
     user_text = event.message.text.strip()
+    if user_text not in ["驗證資訊"]:  # 你可依需求再加白名單
+        if not guard_verified(event, line_bot_api):
+            return
+    # ▲
+
     tz = pytz.timezone("Asia/Taipei")
     try:
         profile = line_bot_api.get_profile(user_id)
