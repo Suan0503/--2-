@@ -177,7 +177,7 @@ def get_menu_carousel():
                             "action": {
                                 "type": "uri",
                                 "label": "📅 班表查詢",
-                                "uri": "https://t.me/+LaFZixvTaMY3ODA1"
+                                "uri": "https://t.me/+svlFjBpb4hxkYjFl"
                             },
                             "style": "secondary",
                             "color": btn_white
