@@ -74,6 +74,17 @@ def get_ad_menu():
             "style": "primary" if i % 2 == 0 else "secondary",
             "color": btn_primary if i % 2 == 0 else btn_secondary
         })
+    # 這裡新增一個回主選單的按鈕
+    buttons.append({
+        "type": "button",
+        "action": {
+            "type": "message",
+            "label": "🏠 回主選單",
+            "text": "主選單"
+        },
+        "style": "secondary",
+        "color": "#FFE5A7"  # 柔沙色，可與主選單一致
+    })
     return FlexSendMessage(
         alt_text="廣告專區",
         contents={
@@ -97,7 +108,7 @@ def get_ad_menu():
             }
         }
     )
-
+    
 def get_menu_carousel():
     """
     主功能選單，夏日海灘柔和風格，按鈕順序已依需求調整
