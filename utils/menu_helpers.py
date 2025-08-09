@@ -57,16 +57,12 @@ JKF_LINKS = [
 
 def get_ad_menu():
     """
-    廣告專區 Flex Message，深色夏日風格
+    廣告專區 Flex Message，10個JKF連結按鈕（名稱可獨立修改），
+    主副色跳色，所有按鈕皆為白色字體。
     """
     buttons = []
-    # 深色夏夜風格色票
     btn_primary = "#2C4A6B"   # 深藍
-    btn_secondary = "#1E3044" # 更深藍
-    btn_gold = "#FFD700"      # 金黃
-    btn_orange = "#FF9800"    # 橘
-    btn_green = "#11806A"     # 深夏綠
-    btn_gray = "#31485C"      # 深灰藍
+    btn_secondary = "#4B99C2" # 深天藍
 
     for i, link in enumerate(JKF_LINKS):
         buttons.append({
@@ -76,7 +72,7 @@ def get_ad_menu():
                 "label": link["label"],
                 "uri": link["url"]
             },
-            "style": "primary" if i % 2 == 0 else "secondary",
+            "style": "primary",  # 全部主色，確保字體白色
             "color": btn_primary if i % 2 == 0 else btn_secondary
         })
     # 回主選單按鈕
@@ -88,7 +84,7 @@ def get_ad_menu():
             "text": "主選單"
         },
         "style": "primary",
-        "color": btn_gold
+        "color": btn_secondary
     })
     return FlexSendMessage(
         alt_text="廣告專區",
@@ -125,7 +121,6 @@ def get_menu_carousel():
     """
     主功能選單，深色夏日風格
     """
-    # 深色夏夜色系
     main_bg1 = "#1C2636"     # 深夏夜藍
     main_bg2 = "#222E44"     # 次深夜藍
     btn_yellow = "#FFD700"   # 金黃
