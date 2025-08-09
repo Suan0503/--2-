@@ -47,30 +47,6 @@ def handle_report(event):
                 TextSendMessage(text="請輸入正確的網址格式（必須以 http:// 或 https:// 開頭）\n如需取消，請輸入「取消」")
             )
             return
-        
-        # === 雙重驗證機制開始 ===
-        # 1. 查詢所有已通過的回報文（Coupon type="report"）有沒有相同網址
-        existing_coupon = Coupon.query.filter_by(type="report").filter(Coupon.report_no != None).order_by(Coupon.id.asc()).all()
-        for coupon in existing_coupon:
-            # 這裡假設報告網址存在 report_url 欄位（沒有的話需加上！）
-            if hasattr(coupon, "report_url") and coupon.report_url == url:
-                line_bot_api.reply_message(
-                    event.reply_token,
-                    TextSendMessage(text=f"此回報文已被回報 回報ID為：{coupon.report_no}")
-                )
-                temp_users.pop(user_id, None)
-                return
-        # 2. 查詢目前待審核中的回報文（尚未通過但送審中的）
-        for pending_id, pending in report_pending_map.items():
-            if pending.get("url") == url:
-                line_bot_api.reply_message(
-                    event.reply_token,
-                    TextSendMessage(text=f"此回報文已被回報（待審核中） 回報ID為：{pending.get('report_no', '待審核')}")
-                )
-                temp_users.pop(user_id, None)
-                return
-        # === 雙重驗證機制結束 ===
-
         wl = Whitelist.query.filter_by(line_user_id=user_id).first()
         user_number = wl.id if wl else ""
         user_lineid = wl.line_id if wl else ""
@@ -156,15 +132,13 @@ def handle_report_postback(event):
                 tz = pytz.timezone("Asia/Taipei")
                 today = datetime.now(tz).strftime("%Y-%m-%d")
                 # 回報文寫入 coupon.amount=0, type="report"（預設0，只有中獎才會改成大於0）
-                # 假設你有 report_url 欄位，記得要存進去！
                 new_coupon = Coupon(
                     line_user_id=to_user_id,
                     amount=0,  # ← 修改為 0
                     date=today,
                     created_at=datetime.now(tz),
                     report_no=report_no,
-                    type="report",
-                    report_url=info["url"]  # <--- 新增這行，記錄網址（確保你的Coupon有這欄位！）
+                    type="report"
                 )
                 db.session.add(new_coupon)
                 db.session.commit()
