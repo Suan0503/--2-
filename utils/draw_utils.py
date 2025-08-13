@@ -8,7 +8,7 @@ def draw_coupon():
     執行抽獎，根據機率回傳金額
     """
     chance = random.random()
-    if chance < 0.01:
+    if chance < 0.0001:
         return 500
     elif chance < 0.03:
         return 300
