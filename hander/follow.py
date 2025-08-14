@@ -1,18 +1,11 @@
-from linebot.models import FollowEvent, TextSendMessage, QuickReply, QuickReplyButton, MessageAction
-from extensions import line_bot_api
-
 def handle_follow(event):
     welcome_msg = (
         "歡迎加入🍵茗殿🍵\n"
         "\n"
-        "📜 驗證流程如下：\n"
-        "1️⃣ 閱讀規則後點擊『我同意規則』\n"
-        "2️⃣ 依步驟輸入手機號與 LINE ID\n"
-        "3️⃣ 上傳 LINE 個人檔案截圖\n"
-        "4️⃣ 系統進行快速自動驗證\n"
-        "5️⃣ 如無法辨識將交由客服人工處理\n"
+        "請按照步驟完成驗證\n"
+        "完成驗證才能預約\n"
         "\n"
-        "✅ 完成驗證即可解鎖專屬客服＆預約功能💖"
+        "※小助手無法預約，請洽專屬總機"
     )
     line_bot_api.reply_message(
         event.reply_token,
