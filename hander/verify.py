@@ -237,6 +237,11 @@ def handle_verify(event):
     # Step 1: 輸入手機號碼
     if user_id in temp_users and temp_users[user_id].get("step") == "waiting_phone":
         phone = normalize_phone(user_text)
+        # 新增黑名單判斷
+        if Blacklist.query.filter_by(phone=phone).first():
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="❌ 請聯絡管理員，無法自動通過驗證流程。"))
+            temp_users.pop(user_id)
+            return
         if not phone.startswith("09") or len(phone) != 10:
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="⚠️ 請輸入正確的手機號碼（09開頭共10碼）"))
             return
