@@ -37,6 +37,35 @@ def handle_verify(event):
     except Exception:
         display_name = "用戶"
 
+    # 查詢模組
+    if user_text.startswith("查詢 - "):
+        phone = normalize_phone(user_text.replace("查詢 - ", "").strip())
+        msg = f"查詢號碼：{phone}\n查詢結果："
+        # 查白名單
+        wl = Whitelist.query.filter_by(phone=phone).first()
+        if wl:
+            msg += " O白名單\n"
+            msg += (
+                f"暱稱：{wl.name}\n"
+                f"LINE ID：{wl.line_id or '未登記'}\n"
+                f"驗證時間：{wl.created_at.astimezone(tz).strftime('%Y/%m/%d %H:%M:%S')}\n"
+            )
+        else:
+            msg += " X白名單\n"
+        # 查黑名單
+        bl = Blacklist.query.filter_by(phone=phone).first()
+        if bl:
+            msg += " O黑名單\n"
+            msg += (
+                f"暱稱：{bl.name}\n"
+                f"LINE ID：{getattr(bl, 'line_id', '未登記')}\n"
+                f"加入時間：{getattr(bl, 'created_at', '未紀錄') if hasattr(bl, 'created_at') else '未紀錄'}\n"
+            )
+        else:
+            msg += " X黑名單\n"
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=msg))
+        return
+
     # 管理員手動黑名單流程
     if user_text.startswith("手動黑名單 - "):
         if user_id not in ADMIN_IDS:
