@@ -34,16 +34,16 @@ JKF_LINKS = [
         "url": "https://www.jkforum.net/p/thread-17742482-1-1.html"
     },
     {
-        "label": "檔期推薦 - 奇蹟",
-        "url": "https://www.jkforum.net/p/thread-20273100-1-1.html"
+        "label": "檔期推薦 - 多多",
+        "url": "https://www.jkforum.net/p/thread-20296958-1-1.html"
     },
     {
-        "label": "檔期推薦 - 小不點",
-        "url": "https://www.jkforum.net/p/thread-20275231-1-1.html"
+        "label": "檔期推薦 - 莎莎",
+        "url": "https://www.jkforum.net/p/thread-20296970-1-1.html"
     },
     {
-        "label": "本期空缺中",
-        "url": "https://www.jkforum.net/p/thread-15744749-1-1.html"
+        "label": "檔期推薦 - 心心",
+        "url": "https://www.jkforum.net/p/thread-10248540-1-1.html"
     },
     {
         "label": "本期空缺中",
