@@ -336,6 +336,7 @@ def handle_verify(event):
         data = temp_users[user_id]
         now = datetime.now(tz)
         data["date"] = now.strftime("%Y-%m-%d")
+        # 修正點：加上 reverify 參數
         record, is_new = update_or_create_whitelist_from_data(data, user_id, reverify=temp_users[user_id].get("reverify", False))
         reply = (
             f"📱 {record.phone}\n"
