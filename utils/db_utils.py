@@ -1,48 +1,50 @@
-from models import db, Whitelist
+from models import Whitelist, db
 from datetime import datetime
 
-def update_or_create_whitelist_from_data(data, user_id=None):
+def update_or_create_whitelist_from_data(data, user_id, reverify=False):
     """
-    用戶手機號碼重複時，直接補齊原本缺的欄位，不會覆蓋已填寫的舊值。若無則新增。
-    :param data: dict, 包含 phone、name、line_id、reason、date 等欄位
-    :param user_id: LINE 用戶 id
-    :return: (record, is_new) -> record: Whitelist 物件, is_new: 是否新建
+    根據 data 內容建立或更新白名單紀錄。
+    :param data: 用戶資料 dict
+    :param user_id: LINE user id
+    :param reverify: 是否重新驗證 (布林值，預設 False)
+    :return: (record, is_new)
     """
-    existing = Whitelist.query.filter_by(phone=data["phone"]).first()
-    need_commit = False
-    if existing:
-        # 只補空的欄位，不覆蓋已存在的值
-        if data.get("name") and not existing.name:
-            existing.name = data["name"]
-            need_commit = True
-        if data.get("line_id") and not existing.line_id:
-            existing.line_id = data["line_id"]
-            need_commit = True
-        if user_id and not existing.line_user_id:
-            existing.line_user_id = user_id
-            need_commit = True
-        if data.get("reason") and not existing.reason:
-            existing.reason = data["reason"]
-            need_commit = True
-        if data.get("date") and not existing.date:
-            existing.date = data["date"]
-            need_commit = True
-        if need_commit:
+    record = Whitelist.query.filter_by(line_user_id=user_id).first()
+    is_new = False
+
+    if record:
+        # 若 reverify，重設部分欄位及驗證時間
+        if reverify:
+            record.phone = data.get("phone", record.phone)
+            record.name = data.get("name", record.name)
+            record.line_id = data.get("line_id", record.line_id)
+            record.created_at = datetime.now()
             db.session.commit()
-        return existing, False  # False 代表覆寫
+        else:
+            # 正常更新，僅補全空欄位
+            updated = False
+            if not record.phone and data.get("phone"):
+                record.phone = data["phone"]
+                updated = True
+            if not record.name and data.get("name"):
+                record.name = data["name"]
+                updated = True
+            if not record.line_id and data.get("line_id"):
+                record.line_id = data["line_id"]
+                updated = True
+            if updated:
+                db.session.commit()
     else:
-        new_user = Whitelist(
-            phone=data["phone"],
+        # 新增白名單資料
+        record = Whitelist(
+            phone=data.get("phone"),
             name=data.get("name"),
             line_id=data.get("line_id"),
-            line_user_id=user_id if user_id else data.get("line_user_id"),
-            reason=data.get("reason"),
-            date=data.get("date"),
-            created_at=datetime.utcnow()
+            line_user_id=user_id,
+            created_at=datetime.now()
         )
-        db.session.add(new_user)
+        db.session.add(record)
         db.session.commit()
-        return new_user, True  # True 代表新建
+        is_new = True
 
-def is_user_verified(line_user_id):
-    return Whitelist.query.filter_by(line_user_id=line_user_id).first() is not None
+    return record, is_new
