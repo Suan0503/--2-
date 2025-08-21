@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.INFO)
 @handler.add(FollowEvent)
 def on_follow(event):
     logging.info(f"[FollowEvent] Source: {event.source}")
-    handle_follow(event)  # 只呼叫這個！不要有其他 reply_message
+    handle_follow(event, line_bot_api)  # 修正：傳入 line_bot_api
 
 @handler.add(MessageEvent, message=ImageMessage)
 def on_image(event):
