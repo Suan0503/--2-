@@ -1,4 +1,4 @@
-def handle_follow(event):
+def handle_follow(event, line_bot_api):
     welcome_msg = (
         "歡迎加入🍵茗殿🍵\n"
         "\n"
