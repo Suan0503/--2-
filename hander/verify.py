@@ -54,9 +54,19 @@ def handle_verify(event):
     # --- 新增：若使用者尚未在 temp_users，但訊息本身就是手機，直接當作 Step1 處理 ---
     phone_candidate = normalize_phone(user_text)
     if user_id not in temp_users and re.match(r"^09\d{8}$", phone_candidate):
-        # 若已驗證過（以 line_user_id 判斷），回覆已驗證訊息
-        if Whitelist.query.filter_by(line_user_id=user_id).first():
-            reply_with_reverify(event, "您已通過驗證，無需再次輸入手機。")
+        # 若已驗證過（以 line_user_id 判斷），顯示主選單與驗證資訊（而非僅回覆提示）
+        existing = Whitelist.query.filter_by(line_user_id=user_id).first()
+        if existing:
+            reply = (
+                f"📱 {existing.phone}\n"
+                f"🌸 暱稱：{existing.name or display_name}\n"
+                f"       個人編號：{existing.id}\n"
+                f"🔗 LINE ID：{existing.line_id or '未登記'}\n"
+                f"🕒 {existing.created_at.astimezone(tz).strftime('%Y/%m/%d %H:%M:%S')}\n"
+                f"✅ 驗證成功，歡迎加入茗殿\n"
+                f"🌟 加入密碼：ming666"
+            )
+            reply_with_menu(event.reply_token, reply)
             return
         # 若在黑名單，拒絕
         if Blacklist.query.filter_by(phone=phone_candidate).first():
