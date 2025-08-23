@@ -23,7 +23,7 @@ OCR_DEBUG_IMAGE_BASEURL = os.getenv("OCR_DEBUG_IMAGE_BASEURL", "").rstrip("/")  
 OCR_DEBUG_IMAGE_DIR = os.getenv("OCR_DEBUG_IMAGE_DIR", "/tmp/ocr_debug")        # 需自行以靜態伺服器對外提供
 
 # manual_verify_pending: {
-#   target_user_id: {
+#   target_user_id_or_placeholder: {
 #       "phone": ...,
 #       "line_id": ...,
 #       "nickname": ...,
@@ -99,6 +99,13 @@ def generate_verification_code(length=8):
     # 使用 secrets 產生數字驗證碼
     return "".join(str(secrets.randbelow(10)) for _ in range(length))
 
+def _find_pending_by_code(code):
+    """回傳 (key, pending) 若未找到回傳 (None, None)"""
+    for key, pending in manual_verify_pending.items():
+        if pending and pending.get("code") == code:
+            return key, pending
+    return None, None
+
 # ──────────────────────────────────────────────────────────────────[...]
 # 1) 加入好友：送歡迎訊息（你指定的文案）
 # ──────────────────────────────────────────────────────────────────[...]
@@ -113,13 +120,17 @@ def handle_follow(event):
 
 # ──────────────────────────────────────────────────────────────────[...]
 # 管理員：發起手動驗證（多步）相關 helper
-# 變更重點：驗證碼只回傳給管理員，系統不自動發給使用者
+# 變更重點：驗證碼只回傳給管理員（reply），系統不自動發給使用者
+# 並允許管理員在 temp_users 中找不到使用者時仍建立 pending（以 phone 或 placeholder 為 key）
 # ──────────────────────────────────────────────────────────────────[...]
-def start_manual_verify_by_admin(admin_id, target_user_id, nickname, phone, line_id):
-    """建立 manual pending，並回傳 8 位驗證碼（呼叫端負責回覆管理員）。"""
+def start_manual_verify_by_admin(admin_id, target_key, nickname, phone, line_id):
+    """
+    建立 manual pending，並回傳 8 位驗證碼（呼叫端負責回覆管理員）。
+    target_key 可以是 user_id，也可以是 phone 或其他 placeholder。
+    """
     code = generate_verification_code(8)
     tz = pytz.timezone("Asia/Taipei")
-    manual_verify_pending[target_user_id] = {
+    manual_verify_pending[target_key] = {
         "phone": phone,
         "line_id": line_id,
         "nickname": nickname,
@@ -131,8 +142,7 @@ def start_manual_verify_by_admin(admin_id, target_user_id, nickname, phone, line
         "allow_user_confirm_until": None,
     }
 
-    # 不再自動用 push_message 發送給管理員（避免耗用 push 配額 / 被 429 拒絕）
-    logging.info(f"manual_verify_pending created for {target_user_id} by admin {admin_id}")
+    logging.info(f"manual_verify_pending created for {target_key} by admin {admin_id}")
     return code
 
 def admin_approve_manual_verify(admin_id, target_user_id):
@@ -225,22 +235,23 @@ def handle_text(event):
                 reply_basic(event, "發生錯誤：找不到先前輸入的手機號，請重新開始手動驗證流程。")
                 admin_manual_flow.pop(user_id, None)
                 return
-            # 在 temp_users 中找尋該 phone 對應的 user_id
+            # 在 temp_users 中找尋該 phone 對應的 user_id（嘗試）
             target_user_id = None
             for uid, data in temp_users.items():
                 if data.get("phone") and normalize_phone(data.get("phone")) == normalize_phone(phone):
                     target_user_id = uid
                     break
             if not target_user_id:
-                # 若找不到，可以回覆管理員並讓管理員決定是否以 phone 為 key（本版本要求 temp_users 中要有該 user）
-                reply_basic(event, "找不到正在驗證的使用者（temp_users 中無此手機）。請確定使用者已先行啟動驗證流程，或手動提供 user_id。")
+                # 若找不到，改為直接建立 pending（以 phone 作為 key），不再強制要求 temp_users
+                code = start_manual_verify_by_admin(user_id, phone, nickname, phone, line_id)
                 admin_manual_flow.pop(user_id, None)
+                # 直接在管理員的回覆中顯示驗證碼（避免使用 push_message 遭遇配額問題）
+                reply_basic(event, f"找不到 temp_users 中的對應 user，但已建立手動驗證（暫存 key 為手機號）。\n已產生驗證碼：{code}\n請將驗證碼貼給使用者，使用者輸入驗證碼後即可完成驗證。")
                 return
 
-            # 建立 manual pending 並將驗證碼回傳給管理員（由管理員貼給使用者）
+            # 若找到 target_user_id（原行為）：建立 manual pending 並將驗證碼回傳給管理員（由管理員貼給使用者）
             code = start_manual_verify_by_admin(user_id, target_user_id, nickname, phone, line_id)
             admin_manual_flow.pop(user_id, None)
-            # 直接在管理員的回覆中顯示驗證碼（避免使用 push_message 遭遇配額問題）
             reply_basic(event, f"已產生驗證碼：{code}\n請將驗證碼貼給使用者 {target_user_id} 以完成驗證。")
             return
 
@@ -323,7 +334,21 @@ def handle_text(event):
 
     # 若使用者輸入 8 位數（管理員把碼貼給使用者後，使用者輸入）
     if re.match(r"^\d{8}$", user_text):
+        # 先嘗試以 user_id 找 pending
         pending = manual_verify_pending.get(user_id)
+        pending_key = user_id
+        if not pending:
+            # 若沒有以該 user_id 為 key 的 pending，嘗試依驗證碼找 pending（管理員可先建立 pending 但不在 temp_users）
+            found_key, found_pending = _find_pending_by_code(user_text)
+            if found_pending:
+                # 把 pending 重新指派給實際輸入驗證碼的使用者（方便後續按 1 的流程）
+                manual_verify_pending[user_id] = found_pending
+                # 刪除舊的 placeholder key（如果和 user_id 不同）
+                if found_key != user_id:
+                    manual_verify_pending.pop(found_key, None)
+                pending = found_pending
+                pending_key = user_id
+
         if pending and pending.get("code") == user_text:
             # 使用者輸入正確驗證碼
             tz = pytz.timezone("Asia/Taipei")
@@ -590,9 +615,19 @@ def handle_post_ocr_confirm(event):
         return
 
     # 若使用者輸入 8 位數（管理員把碼貼給使用者後，使用者輸入）
-    # 也處理在此函式：若符合 pending，顯示確認畫面（不通知管理員）
+    # 也處理在此函式：若符合 pending（不論原先 key 為何），顯示確認畫面（不通知管理員）
     if re.match(r"^\d{8}$", user_text):
+        # 先嘗試以 user_id 找 pending
         pending = manual_verify_pending.get(user_id)
+        if not pending:
+            # 若沒有，以 code 找 pending，並把 pending 轉為以實際輸入 user_id 為 key
+            found_key, found_pending = _find_pending_by_code(user_text)
+            if found_pending:
+                manual_verify_pending[user_id] = found_pending
+                if found_key != user_id:
+                    manual_verify_pending.pop(found_key, None)
+                pending = found_pending
+
         if pending and pending.get("code") == user_text:
             tz = pytz.timezone("Asia/Taipei")
             pending["code_verified"] = True
