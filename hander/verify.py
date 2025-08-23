@@ -97,6 +97,7 @@ def save_debug_image(temp_path, user_id):
 
 def generate_verification_code(length=8):
     # 使用 secrets 產生數字驗證碼
+    # 若需要可改為包含字母以減少撞碼風險
     return "".join(str(secrets.randbelow(10)) for _ in range(length))
 
 def _find_pending_by_code(code):
@@ -128,7 +129,14 @@ def start_manual_verify_by_admin(admin_id, target_key, nickname, phone, line_id)
     建立 manual pending，並回傳 8 位驗證碼（呼叫端負責回覆管理員）。
     target_key 可以是 user_id，也可以是 phone 或其他 placeholder。
     """
-    code = generate_verification_code(8)
+    # 確認 code 不與現有 pending 衝突（簡單重試）
+    for _ in range(5):
+        code = generate_verification_code(8)
+        # 若 code 已存在則重試
+        found_key, found_pending = _find_pending_by_code(code)
+        if not found_pending:
+            break
+
     tz = pytz.timezone("Asia/Taipei")
     manual_verify_pending[target_key] = {
         "phone": phone,
@@ -142,7 +150,7 @@ def start_manual_verify_by_admin(admin_id, target_key, nickname, phone, line_id)
         "allow_user_confirm_until": None,
     }
 
-    logging.info(f"manual_verify_pending created for {target_key} by admin {admin_id}")
+    logging.info(f"manual_verify_pending created for {target_key} by admin {admin_id} (code={code})")
     return code
 
 def admin_approve_manual_verify(admin_id, target_user_id):
@@ -547,6 +555,10 @@ def handle_image(event):
 # ──────────────────────────────────────────────────────────────────[...]
 @handler.add(MessageEvent, message=TextMessage)
 def handle_post_ocr_confirm(event):
+    """
+    處理特定情況（重新上傳 / 重新輸入LINE ID / 重新驗證 / 使用者輸入 8 位 code / 使用者按 1）。
+    回傳 True 表示已處理該事件；回傳 False 表示未處理（讓其他 handler 接手）。
+    """
     user_id = event.source.user_id
     user_text = (event.message.text or "").strip()
     tz = pytz.timezone("Asia/Taipei")
@@ -555,13 +567,13 @@ def handle_post_ocr_confirm(event):
     if user_id in temp_users and temp_users[user_id].get("step") in ("waiting_screenshot", "waiting_confirm_after_ocr") and user_text == "重新上傳":
         temp_users[user_id]["step"] = "waiting_screenshot"
         reply_basic(event, "請重新上傳您的 LINE 個人頁面截圖（個人檔案按進去後請直接截圖）。")
-        return
+        return True
 
     # 重新輸入 LINE ID（只回到輸入 ID 那一步）
     if user_id in temp_users and temp_users[user_id].get("step") == "waiting_confirm_after_ocr" and user_text == "重新輸入LINE ID":
         temp_users[user_id]["step"] = "waiting_lineid"
         reply_basic(event, "請輸入新的 LINE ID（或輸入：尚未設定）。")
-        return
+        return True
 
     # 重新驗證（從頭開始，回到輸入手機） - 可以在任何時候觸發
     if user_text == "重新驗證":
@@ -572,7 +584,7 @@ def handle_post_ocr_confirm(event):
             display_name = temp_users.get(user_id, {}).get("name", "用戶")
         temp_users[user_id] = {"step": "waiting_phone", "name": display_name, "reverify": True}
         reply_basic(event, "請輸入您的手機號碼（09開頭）開始重新驗證～")
-        return
+        return True
 
     # 僅在 manual_verify_pending 且使用者剛驗證過 8 位碼，並在 allow_user_confirm_until 時限內，才接受「1」
     if user_text == "1":
@@ -604,15 +616,15 @@ def handle_post_ocr_confirm(event):
                 # 刪除 pending 與 temp_users
                 manual_verify_pending.pop(user_id, None)
                 temp_users.pop(user_id, None)
-                return
+                return True
             else:
                 # 時限已過
                 manual_verify_pending.pop(user_id, None)
                 reply_basic(event, "按 1 時限已過，請重新向管理員申請手動驗證或等待管理員核准。")
-                return
+                return True
         # 若沒有符合的 pending，視為無效
         reply_basic(event, "無效指令或無待處理的人工驗證。若要重新驗證請點「重新驗證」。")
-        return
+        return True
 
     # 若使用者輸入 8 位數（管理員把碼貼給使用者後，使用者輸入）
     # 也處理在此函式：若符合 pending（不論原先 key 為何），顯示確認畫面（不通知管理員）
@@ -648,24 +660,32 @@ def handle_post_ocr_confirm(event):
                     quick_reply=make_qr(("完成驗證", "1"), ("重新驗證", "重新驗證"))
                 )
             )
-            return
+            return True
 
-    # 若非上面情況，讓其他 handler／流程繼續處理（例如 handle_text 中的 step 流程）
-    return
+    # 若沒被上面任何一個條件處理，回傳 False，代表沒處理此事件
+    return False
 
-# ---- 新增：供 hander.entrypoint import 使用的 wrapper ----
+
+# ---- 新的 dispatch wrapper：先讓 post_ocr 嘗試處理，再回 fallback 給 handle_text ----
 def handle_verify(event):
     """
     Entrypoint wrapper：hander.entrypoint 會呼叫這個函式
-    根據 event 的類型分派到 verify 模組中的處理函式。
-    這是為了解決 'cannot import name handle_verify' 的導入錯誤。
+    先讓 handle_post_ocr_confirm 嘗試處理文字事件（像是 8 位碼、按 1），
+    若它回傳 True（代表已處理），就不要再呼叫 handle_text。
     """
     try:
         # 若是 MessageEvent 且有 message 屬性，根據 message 類型分派
         if hasattr(event, "message") and event.message is not None:
             msg = event.message
-            # TextMessage -> 呼叫 handle_text
+            # TextMessage -> 先讓 post_ocr 處理，若沒處理再交給 handle_text
             if isinstance(msg, TextMessage):
+                try:
+                    handled = handle_post_ocr_confirm(event)
+                except Exception:
+                    logging.exception("handle_post_ocr_confirm failed")
+                    handled = False
+                if handled:
+                    return
                 return handle_text(event)
             # ImageMessage -> 呼叫 handle_image
             if isinstance(msg, ImageMessage):
