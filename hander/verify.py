@@ -15,9 +15,9 @@ import pytz
 from PIL import Image
 import pytesseract
 
-# ─────────────────────────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────[...]
 # 全域設定
-# ─────────────────────────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────[...]
 VERIFY_CODE_EXPIRE = 900  # 驗證碼有效時間(秒)
 OCR_DEBUG_IMAGE_BASEURL = os.getenv("OCR_DEBUG_IMAGE_BASEURL", "").rstrip("/")  # 例: https://your.cdn.com/ocr
 OCR_DEBUG_IMAGE_DIR = os.getenv("OCR_DEBUG_IMAGE_DIR", "/tmp/ocr_debug")        # 需自行以靜態伺服器對外提供
@@ -41,9 +41,9 @@ manual_verify_pending = {}
 # { admin_id: {"step": "awaiting_phone"/"awaiting_lineid", "nickname": ..., "phone": ...} }
 admin_manual_flow = {}
 
-# ─────────────────────────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────[...]
 # 小工具
-# ─────────────────────────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────[...]
 def normalize_phone(phone):
     phone = (phone or "").replace(" ", "").replace("-", "")
     if phone.startswith("+886"):
@@ -99,9 +99,9 @@ def generate_verification_code(length=8):
     # 使用 secrets 產生數字驗證碼
     return "".join(str(secrets.randbelow(10)) for _ in range(length))
 
-# ─────────────────────────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────[...]
 # 1) 加入好友：送歡迎訊息（你指定的文案）
-# ─────────────────────────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────[...]
 @handler.add(FollowEvent)
 def handle_follow(event):
     welcome_msg = (
@@ -111,12 +111,12 @@ def handle_follow(event):
     )
     line_bot_api.reply_message(event.reply_token, TextSendMessage(text=welcome_msg))
 
-# ─────────────────────────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────[...]
 # 管理員：發起手動驗證（多步）相關 helper
 # 變更重點：驗證碼只回傳給管理員，系統不自動發給使用者
-# ─────────────────────────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────[...]
 def start_manual_verify_by_admin(admin_id, target_user_id, nickname, phone, line_id):
-    """建立 manual pending，並把 8 位驗證碼回傳給管理員（由管理員轉給使用者）"""
+    """建立 manual pending，並回傳 8 位驗證碼（呼叫端負責回覆管理員）。"""
     code = generate_verification_code(8)
     tz = pytz.timezone("Asia/Taipei")
     manual_verify_pending[target_user_id] = {
@@ -131,20 +131,9 @@ def start_manual_verify_by_admin(admin_id, target_user_id, nickname, phone, line
         "allow_user_confirm_until": None,
     }
 
-    # 將驗證碼直接發回給發起的管理員（管理員會貼給使用者）
-    try:
-        line_bot_api.push_message(
-            admin_id,
-            TextSendMessage(text=f"手動驗證已建立（對象暱稱：{nickname}，手機：{phone}）。\n請把下列 8 位驗證碼貼給使用者：\n\n{code}")
-        )
-    except Exception:
-        logging.exception("notify admin with code failed")
-
-    # 回覆管理員（確認回覆）
-    try:
-        line_bot_api.push_message(admin_id, TextSendMessage(text=f"已發送驗證碼給管理員，請複製並貼給使用者 {target_user_id}。"))
-    except Exception:
-        logging.exception("notify admin confirmation failed")
+    # 不再自動用 push_message 發送給管理員（避免耗用 push 配額 / 被 429 拒絕）
+    logging.info(f"manual_verify_pending created for {target_user_id} by admin {admin_id}")
+    return code
 
 def admin_approve_manual_verify(admin_id, target_user_id):
     pending = manual_verify_pending.pop(target_user_id, None)
@@ -189,11 +178,11 @@ def admin_reject_manual_verify(admin_id, target_user_id):
         logging.exception("notify admin after reject failed")
     return True, "已拒絕"
 
-# ─────────────────────────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────[...]
 # 2) 文字訊息：手機 → LINE ID → 要截圖
 #    同時保留你的查詢 / 管理路徑（可依需要調整）
 #    也處理管理員的手動驗證多步流程 & 管理員命令
-# ─────────────────────────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────[...]
 @handler.add(MessageEvent, message=TextMessage)
 def handle_text(event):
     user_id = event.source.user_id
@@ -249,9 +238,10 @@ def handle_text(event):
                 return
 
             # 建立 manual pending 並將驗證碼回傳給管理員（由管理員貼給使用者）
-            start_manual_verify_by_admin(user_id, target_user_id, nickname, phone, line_id)
+            code = start_manual_verify_by_admin(user_id, target_user_id, nickname, phone, line_id)
             admin_manual_flow.pop(user_id, None)
-            reply_basic(event, "已產生驗證碼並回傳給管理員，請將驗證碼貼給使用者以完成驗證。")
+            # 直接在管理員的回覆中顯示驗證碼（避免使用 push_message 遭遇配額問題）
+            reply_basic(event, f"已產生驗證碼：{code}\n請將驗證碼貼給使用者 {target_user_id} 以完成驗證。")
             return
 
         # 管理員核准 / 拒絕 指令
@@ -424,11 +414,11 @@ def handle_text(event):
         reply_basic(event, "歡迎～請直接輸入手機號碼（09開頭）進行驗證。")
         return
 
-# ─────────────────────────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────[...]
 # 3) 圖片訊息：OCR → 快速通關 / 資料有誤 顯示 OCR 圖片(或文字)
 #    規則：若使用者 LINE ID ≠「尚未設定」且 OCR 文字包含該 ID → 直接通過
 #          否則顯示 OCR 結果與(可選)圖片預覽，提供「重新上傳 / 重新輸入LINE ID / 重新驗證」
-# ─────────────────────────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────[...]
 @handler.add(MessageEvent, message=ImageMessage)
 def handle_image(event):
     user_id = event.source.user_id
@@ -525,11 +515,11 @@ def handle_image(event):
             except Exception:
                 pass
 
-# ─────────────────────────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────[...]
 # 4) OCR/手動驗證後的確認處理
 #    - 使用者按「1」只有在 manual_verify_pending 且剛剛通過 8 位驗證碼的極限定情況被接受
 #    - 當使用者輸入 8 位碼後顯示確認畫面（不通知管理員）
-# ─────────────────────────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────[...]
 @handler.add(MessageEvent, message=TextMessage)
 def handle_post_ocr_confirm(event):
     user_id = event.source.user_id
