@@ -527,7 +527,7 @@ def handle_post_ocr_confirm(event):
         except Exception:
             tu = get_temp_user(user_id)
             display_name = tu.get("name", "用戶") if tu else "用戶"
-    set_temp_user(user_id, {"step": "waiting_phone", "name": display_name, "reverify": True})
+        set_temp_user(user_id, {"step": "waiting_phone", "name": display_name, "reverify": True})
         reply_basic(event, "請輸入您的手機號碼（09開頭）開始重新驗證～")
         return True
 
