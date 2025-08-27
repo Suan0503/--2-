@@ -1,7 +1,7 @@
 from linebot.models import MessageEvent, ImageMessage, TextSendMessage
 from extensions import line_bot_api
 from utils.image_verification import extract_lineid_phone, normalize_phone
-from utils.temp_users import temp_users
+from utils.temp_users import get_temp_user, set_temp_user, pop_temp_user, all_temp_users
 from utils.db_utils import update_or_create_whitelist_from_data
 from datetime import datetime
 import re
@@ -56,7 +56,7 @@ def handle_image(event):
             f"✅ 驗證成功，歡迎加入茗殿\n"
             f"🌟 加入密碼：ming666"
         )
-        temp_users.pop(user_id, None)
+    pop_temp_user(user_id)
         reply_with_menu(event.reply_token, msg)
         return
 

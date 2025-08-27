@@ -3,7 +3,7 @@ from linebot.models import (
 )
 from extensions import line_bot_api, db
 from models import Whitelist, Coupon
-from utils.temp_users import temp_users
+from utils.temp_users import get_temp_user, set_temp_user, pop_temp_user, all_temp_users
 from storage import ADMIN_IDS
 import re, time
 from datetime import datetime
@@ -33,7 +33,7 @@ def handle_report(event):
     # 用戶取消回報流程
     if user_id in temp_users and temp_users[user_id].get("report_pending"):
         if user_text == "取消":
-            temp_users.pop(user_id, None)
+            pop_temp_user(user_id)
             line_bot_api.reply_message(
                 event.reply_token,
                 TextSendMessage(text="已取消回報流程，回到主選單！")
@@ -95,7 +95,7 @@ def handle_report(event):
             event.reply_token,
             TextSendMessage(text="✅ 已收到您的回報，管理員會盡快處理！")
         )
-        temp_users.pop(user_id)
+    pop_temp_user(user_id)
         return
 
     # 管理員填寫拒絕原因
@@ -110,11 +110,11 @@ def handle_report(event):
                 line_bot_api.push_message(to_user_id, TextSendMessage(text=reply))
             except Exception as e:
                 print("推播用戶回報拒絕失敗", e)
-            temp_users.pop(user_id)
+            pop_temp_user(user_id)
             report_pending_map.pop(report_id, None)
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="已將原因回傳給用戶。"))
         else:
-            temp_users.pop(user_id)
+            pop_temp_user(user_id)
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="找不到該回報資料（可能已處理過或超時）"))
         return
 
