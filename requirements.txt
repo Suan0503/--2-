@@ -1,6 +1,6 @@
 Flask
 flask_sqlalchemy
-python-dotenv
+redis
 line-bot-sdk==2.4.1
 pytz
 psycopg2-binary
