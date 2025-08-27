@@ -100,7 +100,6 @@ def _find_pending_by_code(code):
 # ───────────────────────────────────────────────────────────────
 # 1) 加入好友：送歡迎訊息
 # ───────────────────────────────────────────────────────────────
-@handler.add(FollowEvent)
 def handle_follow(event):
     welcome_msg = (
         "歡迎加入🍵茗殿🍵\n"
@@ -156,6 +155,7 @@ def admin_approve_manual_verify(admin_id, target_user_id):
         line_bot_api.push_message(target_user_id, TextSendMessage(text=(
             f"📱 {record.phone}\n"
             f"🌸 暱稱：{record.name or pending.get('nickname')}\n"
+            f"       個人編號：{record.id}\n"
             f"🔗 LINE ID：{record.line_id or pending.get('line_id')}\n"
             f"🕒 {record.created_at.astimezone(tz).strftime('%Y/%m/%d %H:%M:%S')}\n"
             f"管理員已人工核准，驗證完成，歡迎加入。"
@@ -185,7 +185,6 @@ def admin_reject_manual_verify(admin_id, target_user_id):
 # ───────────────────────────────────────────────────────────────
 # 2) 文字訊息：手機 → LINE ID → 要截圖
 # ───────────────────────────────────────────────────────────────
-@handler.add(MessageEvent, message=TextMessage)
 def handle_text(event):
     user_id = event.source.user_id
     user_text = (event.message.text or "").strip()
@@ -358,52 +357,9 @@ def handle_text(event):
     reply_basic(event, "✅ 手機號已登記～請輸入您的 LINE ID（未設定請輸入：尚未設定）")
     return
 
-    tu = get_temp_user(user_id)
-    if tu and tu.get("step") == "waiting_phone":
-        phone = normalize_phone(user_text)
-        if not re.match(r"^09\d{8}$", phone):
-            reply_basic(event, "⚠️ 請輸入正確的手機號碼（09開頭共10碼）")
-            return
-        if Blacklist.query.filter_by(phone=phone).first():
-            reply_basic(event, "❌ 請聯絡管理員，無法自動通過驗證流程。")
-            pop_temp_user(user_id)
-            return
-        owner = Whitelist.query.filter_by(phone=phone).first()
-        if owner and owner.line_user_id and owner.line_user_id != user_id:
-            reply_basic(event, "❌ 此手機已綁定其他帳號，請聯絡客服協助。")
-            return
-        tu["phone"] = phone
-        tu["step"] = "waiting_lineid"
-        set_temp_user(user_id, tu)
-        reply_basic(event, "✅ 手機號已登記～請輸入您的 LINE ID（未設定請輸入：尚未設定）")
-        return
-
-    tu = get_temp_user(user_id)
-    if tu and tu.get("step") == "waiting_lineid":
-        line_id = user_text.strip()
-        if not line_id:
-            reply_basic(event, "⚠️ 請輸入有效的 LINE ID（或輸入：尚未設定）")
-            return
-        tu["line_id"] = line_id
-        tu["step"] = "waiting_screenshot"
-        set_temp_user(user_id, tu)
-        reply_basic(
-            event,
-            "📸 請上傳您的 LINE 個人頁面截圖\n"
-            "👉 路徑：LINE主頁 > 右上角設定 > 個人檔案 > 點進去後截圖\n"
-            "需清楚顯示 LINE 名稱與（若有）ID，作為驗證依據"
-        )
-        return
-
-    if not get_temp_user(user_id):
-        set_temp_user(user_id, {"step": "waiting_phone", "name": display_name})
-        reply_basic(event, "歡迎～請直接輸入手機號碼（09開頭）進行驗證。")
-        return
-
 # ───────────────────────────────────────────────────────────────
 # 3) 圖片訊息：OCR → 快速通關 / 資料有誤 顯示 OCR 圖片(或文字)
 # ───────────────────────────────────────────────────────────────
-@handler.add(MessageEvent, message=ImageMessage)
 def handle_image(event):
     user_id = event.source.user_id
     tu = get_temp_user(user_id)
@@ -500,7 +456,6 @@ def handle_image(event):
 # ───────────────────────────────────────────────────────────────
 # 4) OCR/手動驗證後的確認處理
 # ───────────────────────────────────────────────────────────────
-@handler.add(MessageEvent, message=TextMessage)
 def handle_post_ocr_confirm(event):
     user_id = event.source.user_id
     user_text = (event.message.text or "").strip()
