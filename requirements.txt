@@ -1,5 +1,7 @@
 Flask
 flask_sqlalchemy
+flask_admin
+python-dotenv
 redis
 line-bot-sdk==2.4.1
 pytz
@@ -9,3 +11,4 @@ pytesseract
 opencv-python-headless
 numpy
 gunicorn
+wtforms==2.3.3
