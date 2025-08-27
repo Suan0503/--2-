@@ -113,11 +113,16 @@ def handle_follow(event):
 # 管理員：發起手動驗證（多步）相關 helper
 # ───────────────────────────────────────────────────────────────
 def start_manual_verify_by_admin(admin_id, target_key, nickname, phone, line_id):
+    code = None
     for _ in range(5):
-        code = generate_verification_code(8)
-        found_key, found_pending = _find_pending_by_code(code)
+        temp_code = generate_verification_code(8)
+        found_key, found_pending = _find_pending_by_code(temp_code)
         if not found_pending:
+            code = temp_code
             break
+    if code is None:
+        # fallback: always assign a code even if not unique
+        code = generate_verification_code(8)
 
     tz = pytz.timezone("Asia/Taipei")
     manual_verify_pending[target_key] = {
@@ -514,6 +519,27 @@ def handle_post_ocr_confirm(event):
         return True
 
     if user_text == "1":
+        # 一般用戶 OCR 比對失敗後，step 為 waiting_confirm_after_ocr
+        if user_id in temp_users and temp_users[user_id].get("step") == "waiting_confirm_after_ocr":
+            tz = pytz.timezone("Asia/Taipei")
+            data = temp_users[user_id]
+            now = datetime.now(tz)
+            data["date"] = now.strftime("%Y-%m-%d")
+            record, _ = update_or_create_whitelist_from_data(
+                data, user_id, reverify=data.get("reverify", False)
+            )
+            reply = (
+                f"📱 {record.phone}\n"
+                f"🌸 暱稱：{record.name or '用戶'}\n"
+                f"🔗 LINE ID：{record.line_id or '未登記'}\n"
+                f"🕒 {record.created_at.astimezone(tz).strftime('%Y/%m/%d %H:%M:%S')}\n"
+                f"✅ 驗證成功，歡迎加入茗殿\n"
+                f"🌟 加入密碼：ming666"
+            )
+            reply_with_menu(event.reply_token, reply)
+            temp_users.pop(user_id, None)
+            return True
+        # 管理員人工驗證流程
         pending = manual_verify_pending.get(user_id)
         if pending and pending.get("code_verified"):
             until = pending.get("allow_user_confirm_until")
