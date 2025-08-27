@@ -23,7 +23,7 @@ def handle_report(event):
 
     # 啟動回報流程
     if user_text in ["回報文", "Report", "report"]:
-        temp_users[user_id] = {"report_pending": True}
+        set_temp_user(user_id, {"report_pending": True})
         line_bot_api.reply_message(
             event.reply_token,
             TextSendMessage(text="請輸入要回報的網址（請直接貼網址）：\n\n如需取消，請輸入「取消」")
@@ -31,7 +31,8 @@ def handle_report(event):
         return
 
     # 用戶取消回報流程
-    if user_id in temp_users and temp_users[user_id].get("report_pending"):
+    tu = get_temp_user(user_id)
+    if tu and tu.get("report_pending"):
         if user_text == "取消":
             pop_temp_user(user_id)
             line_bot_api.reply_message(
@@ -96,7 +97,7 @@ def handle_report(event):
             TextSendMessage(text="✅ 已收到您的回報，管理員會盡快處理！")
         )
     pop_temp_user(user_id)
-        return
+    return
 
     # 管理員填寫拒絕原因
     if user_id in temp_users and temp_users[user_id].get("report_ng_pending"):
@@ -154,7 +155,7 @@ def handle_report_postback(event):
         report_id = data.split("|")[1]
         info = report_pending_map.get(report_id)
         if info:
-            temp_users[user_id] = {"report_ng_pending": report_id}
+            set_temp_user(user_id, {"report_ng_pending": report_id})
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="請輸入不通過的原因："))
         else:
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="該回報已處理過或超時"))
