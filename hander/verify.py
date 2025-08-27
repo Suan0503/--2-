@@ -5,7 +5,7 @@ from linebot.models import (
 )
 from extensions import handler, line_bot_api, db
 from models import Blacklist, Whitelist
-from utils.temp_users import get_temp_user, set_temp_user, pop_temp_user, all_temp_users
+from utils.temp_users import temp_users
 from hander.admin import ADMIN_IDS
 from utils.menu_helpers import reply_with_menu
 from utils.db_utils import update_or_create_whitelist_from_data
@@ -113,16 +113,11 @@ def handle_follow(event):
 # 管理員：發起手動驗證（多步）相關 helper
 # ───────────────────────────────────────────────────────────────
 def start_manual_verify_by_admin(admin_id, target_key, nickname, phone, line_id):
-    code = None
     for _ in range(5):
-        temp_code = generate_verification_code(8)
-        found_key, found_pending = _find_pending_by_code(temp_code)
-        if not found_pending:
-            code = temp_code
-            break
-    if code is None:
-        # fallback: always assign a code even if not unique
         code = generate_verification_code(8)
+        found_key, found_pending = _find_pending_by_code(code)
+        if not found_pending:
+            break
 
     tz = pytz.timezone("Asia/Taipei")
     manual_verify_pending[target_key] = {
@@ -224,7 +219,7 @@ def handle_text(event):
                 admin_manual_flow.pop(user_id, None)
                 return
             target_user_id = None
-            for uid, data in all_temp_users().items():
+            for uid, data in temp_users.items():
                 if data.get("phone") and normalize_phone(data.get("phone")) == normalize_phone(phone):
                     target_user_id = uid
                     break
@@ -307,7 +302,7 @@ def handle_text(event):
         return
 
     if user_text == "重新驗證":
-        set_temp_user(user_id, {"step": "waiting_phone", "name": display_name, "reverify": True})
+        temp_users[user_id] = {"step": "waiting_phone", "name": display_name, "reverify": True}
         reply_basic(event, "請輸入您的手機號碼（09開頭）開始重新驗證～")
         return
 
@@ -345,7 +340,7 @@ def handle_text(event):
             )
             return
     phone_candidate = normalize_phone(user_text)
-    if not get_temp_user(user_id) and re.match(r"^09\d{8}$", phone_candidate):
+    if user_id not in temp_users and re.match(r"^09\d{8}$", phone_candidate):
         if Blacklist.query.filter_by(phone=phone_candidate).first():
             reply_basic(event, "❌ 請聯絡管理員，無法自動通過驗證流程。❌")
             return
@@ -354,39 +349,36 @@ def handle_text(event):
             reply_basic(event, "❌ 此手機已綁定其他帳號，請聯絡客服協助。")
             return
 
-    set_temp_user(user_id, {"step": "waiting_lineid", "name": display_name, "phone": phone_candidate})
-    reply_basic(event, "✅ 手機號已登記～請輸入您的 LINE ID（未設定請輸入：尚未設定）")
-    return
+        temp_users[user_id] = {"step": "waiting_lineid", "name": display_name, "phone": phone_candidate}
+        reply_basic(event, "✅ 手機號已登記～請輸入您的 LINE ID（未設定請輸入：尚未設定）")
+        return
 
-    tu = get_temp_user(user_id)
-    if tu and tu.get("step") == "waiting_phone":
+    if user_id in temp_users and temp_users[user_id].get("step") == "waiting_phone":
         phone = normalize_phone(user_text)
         if not re.match(r"^09\d{8}$", phone):
             reply_basic(event, "⚠️ 請輸入正確的手機號碼（09開頭共10碼）")
             return
         if Blacklist.query.filter_by(phone=phone).first():
             reply_basic(event, "❌ 請聯絡管理員，無法自動通過驗證流程。")
-            pop_temp_user(user_id)
+            temp_users.pop(user_id, None)
             return
         owner = Whitelist.query.filter_by(phone=phone).first()
         if owner and owner.line_user_id and owner.line_user_id != user_id:
             reply_basic(event, "❌ 此手機已綁定其他帳號，請聯絡客服協助。")
             return
-        tu["phone"] = phone
-        tu["step"] = "waiting_lineid"
-        set_temp_user(user_id, tu)
+
+        temp_users[user_id]["phone"] = phone
+        temp_users[user_id]["step"] = "waiting_lineid"
         reply_basic(event, "✅ 手機號已登記～請輸入您的 LINE ID（未設定請輸入：尚未設定）")
         return
 
-    tu = get_temp_user(user_id)
-    if tu and tu.get("step") == "waiting_lineid":
+    if user_id in temp_users and temp_users[user_id].get("step") == "waiting_lineid":
         line_id = user_text.strip()
         if not line_id:
             reply_basic(event, "⚠️ 請輸入有效的 LINE ID（或輸入：尚未設定）")
             return
-        tu["line_id"] = line_id
-        tu["step"] = "waiting_screenshot"
-        set_temp_user(user_id, tu)
+        temp_users[user_id]["line_id"] = line_id
+        temp_users[user_id]["step"] = "waiting_screenshot"
         reply_basic(
             event,
             "📸 請上傳您的 LINE 個人頁面截圖\n"
@@ -395,8 +387,8 @@ def handle_text(event):
         )
         return
 
-    if not get_temp_user(user_id):
-        set_temp_user(user_id, {"step": "waiting_phone", "name": display_name})
+    if user_id not in temp_users:
+        temp_users[user_id] = {"step": "waiting_phone", "name": display_name}
         reply_basic(event, "歡迎～請直接輸入手機號碼（09開頭）進行驗證。")
         return
 
@@ -406,8 +398,7 @@ def handle_text(event):
 @handler.add(MessageEvent, message=ImageMessage)
 def handle_image(event):
     user_id = event.source.user_id
-    tu = get_temp_user(user_id)
-    if not tu or tu.get("step") != "waiting_screenshot":
+    if user_id not in temp_users or temp_users[user_id].get("step") != "waiting_screenshot":
         reply_with_reverify(event, "請先完成前面步驟後再上傳截圖唷～")
         return
 
@@ -419,8 +410,7 @@ def handle_image(event):
         for chunk in message_content.iter_content():
             f.write(chunk)
 
-    tu = get_temp_user(user_id)
-    expected_line_id = (tu.get("line_id") or "").strip() if tu else ""
+    expected_line_id = (temp_users[user_id].get("line_id") or "").strip()
     try:
         image = Image.open(temp_path)
         ocr_text = pytesseract.image_to_string(image)
@@ -428,11 +418,11 @@ def handle_image(event):
 
         def fast_pass():
             tz = pytz.timezone("Asia/Taipei")
-            data = get_temp_user(user_id)
+            data = temp_users[user_id]
             now = datetime.now(tz)
             data["date"] = now.strftime("%Y-%m-%d")
             record, _ = update_or_create_whitelist_from_data(
-                data, user_id, reverify=(get_temp_user(user_id).get("reverify", False) if get_temp_user(user_id) else False)
+                data, user_id, reverify=temp_users[user_id].get("reverify", False)
             )
             reply = (
                 f"📱 {record.phone}\n"
@@ -443,7 +433,7 @@ def handle_image(event):
                 f"🌟 加入密碼：ming666"
             )
             reply_with_menu(event.reply_token, reply)
-            pop_temp_user(user_id)
+            temp_users.pop(user_id, None)
 
         # 修正：用 .strip().lower() 強化容錯
         if expected_line_id.strip().lower() in ["尚未設定", "未設定", "無", "none", "not set"]:
@@ -470,10 +460,7 @@ def handle_image(event):
             "請選擇：重新上傳 / 重新輸入LINE ID / 重新驗證（從頭）。"
             f"{preview_note}"
         )
-        tu = get_temp_user(user_id)
-        if tu:
-            tu["step"] = "waiting_confirm_after_ocr"
-            set_temp_user(user_id, tu)
+        temp_users[user_id]["step"] = "waiting_confirm_after_ocr"
         text_msg = TextSendMessage(
             text=warn,
             quick_reply=make_qr(
@@ -506,17 +493,13 @@ def handle_post_ocr_confirm(event):
     user_text = (event.message.text or "").strip()
     tz = pytz.timezone("Asia/Taipei")
 
-    tu = get_temp_user(user_id)
-    if tu and tu.get("step") in ("waiting_screenshot", "waiting_confirm_after_ocr") and user_text == "重新上傳":
-        tu["step"] = "waiting_screenshot"
-        set_temp_user(user_id, tu)
+    if user_id in temp_users and temp_users[user_id].get("step") in ("waiting_screenshot", "waiting_confirm_after_ocr") and user_text == "重新上傳":
+        temp_users[user_id]["step"] = "waiting_screenshot"
         reply_basic(event, "請重新上傳您的 LINE 個人頁面截圖（個人檔案按進去後請直接截圖）。")
         return True
 
-    tu = get_temp_user(user_id)
-    if tu and tu.get("step") == "waiting_confirm_after_ocr" and user_text == "重新輸入LINE ID":
-        tu["step"] = "waiting_lineid"
-        set_temp_user(user_id, tu)
+    if user_id in temp_users and temp_users[user_id].get("step") == "waiting_confirm_after_ocr" and user_text == "重新輸入LINE ID":
+        temp_users[user_id]["step"] = "waiting_lineid"
         reply_basic(event, "請輸入新的 LINE ID（或輸入：尚未設定）。")
         return True
 
@@ -525,35 +508,12 @@ def handle_post_ocr_confirm(event):
             profile = line_bot_api.get_profile(user_id)
             display_name = profile.display_name
         except Exception:
-            tu = get_temp_user(user_id)
-            display_name = tu.get("name", "用戶") if tu else "用戶"
-        set_temp_user(user_id, {"step": "waiting_phone", "name": display_name, "reverify": True})
+            display_name = temp_users.get(user_id, {}).get("name", "用戶")
+        temp_users[user_id] = {"step": "waiting_phone", "name": display_name, "reverify": True}
         reply_basic(event, "請輸入您的手機號碼（09開頭）開始重新驗證～")
         return True
 
     if user_text == "1":
-        # 一般用戶 OCR 比對失敗後，step 為 waiting_confirm_after_ocr
-        tu = get_temp_user(user_id)
-        if tu and tu.get("step") == "waiting_confirm_after_ocr":
-            tz = pytz.timezone("Asia/Taipei")
-            data = tu
-            now = datetime.now(tz)
-            data["date"] = now.strftime("%Y-%m-%d")
-            record, _ = update_or_create_whitelist_from_data(
-                data, user_id, reverify=data.get("reverify", False)
-            )
-            reply = (
-                f"📱 {record.phone}\n"
-                f"🌸 暱稱：{record.name or '用戶'}\n"
-                f"🔗 LINE ID：{record.line_id or '未登記'}\n"
-                f"🕒 {record.created_at.astimezone(tz).strftime('%Y/%m/%d %H:%M:%S')}\n"
-                f"✅ 驗證成功，歡迎加入茗殿\n"
-                f"🌟 加入密碼：ming666"
-            )
-            reply_with_menu(event.reply_token, reply)
-            pop_temp_user(user_id)
-            return True
-        # 管理員人工驗證流程
         pending = manual_verify_pending.get(user_id)
         if pending and pending.get("code_verified"):
             until = pending.get("allow_user_confirm_until")
@@ -578,7 +538,7 @@ def handle_post_ocr_confirm(event):
                 )
                 reply_with_menu(event.reply_token, reply)
                 manual_verify_pending.pop(user_id, None)
-                pop_temp_user(user_id)
+                temp_users.pop(user_id, None)
                 return True
             else:
                 manual_verify_pending.pop(user_id, None)
