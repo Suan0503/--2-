@@ -1,6 +1,33 @@
-from models import Whitelist, db
-from datetime import datetime
-from sqlalchemy.exc import IntegrityError
+
+
+from models import Whitelist
+from extensions import db
+from datetime import datetime, timezone
+try:
+    from sqlalchemy.exc import IntegrityError
+except ImportError:
+    IntegrityError = Exception
+import logging
+
+def _now():
+    return datetime.now(timezone.utc)
+
+def _safe_commit():
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"DB commit failed: {e}")
+        raise
+
+def _fill_fields(obj, data, fields, user_id=None, reverify=False):
+    for field in fields:
+        if field == "line_user_id" and user_id:
+            setattr(obj, field, user_id)
+        elif reverify:
+            setattr(obj, field, data.get(field, getattr(obj, field, None)))
+        elif not getattr(obj, field, None) and data.get(field):
+            setattr(obj, field, data[field])
 
 def update_or_create_whitelist_from_data(data, user_id, reverify=False):
     """
@@ -10,98 +37,44 @@ def update_or_create_whitelist_from_data(data, user_id, reverify=False):
     :param reverify: 是否為重新驗證（若為 True，會重設 created_at 並以當前 user_id 為 line_user_id）
     :return: (record, is_new)
     """
-    record = Whitelist.query.filter_by(line_user_id=user_id).first()
-    is_new = False
+    fields = ["phone", "name", "line_id", "line_user_id", "created_at"]
     phone = data.get("phone")
+    is_new = False
 
+    record = Whitelist.query.filter_by(line_user_id=user_id).first()
     if record:
-        # 已有以 line_user_id 為 key 的紀錄，依 reverify 或補全欄位處理
-        if reverify:
-            record.phone = data.get("phone", record.phone)
-            record.name = data.get("name", record.name)
-            record.line_id = data.get("line_id", record.line_id)
-            record.created_at = datetime.now()
-            db.session.commit()
-        else:
-            updated = False
-            if not record.phone and data.get("phone"):
-                record.phone = data["phone"]
-                updated = True
-            if not record.name and data.get("name"):
-                record.name = data["name"]
-                updated = True
-            if not record.line_id and data.get("line_id"):
-                record.line_id = data["line_id"]
-                updated = True
-            if updated:
-                db.session.commit()
+        _fill_fields(record, data, fields, user_id, reverify)
+        record.created_at = _now() if reverify else record.created_at
+        _safe_commit()
         return record, is_new
 
-    # 若沒有以 line_user_id 找到，先用 phone 檢查避免 unique constraint 衝突
     if phone:
         existing_by_phone = Whitelist.query.filter_by(phone=phone).first()
         if existing_by_phone:
-            # 若為重新驗證，更新主要欄位並把 line_user_id 指回當前 user_id
-            if reverify:
-                existing_by_phone.name = data.get("name", existing_by_phone.name)
-                existing_by_phone.line_id = data.get("line_id", existing_by_phone.line_id)
-                existing_by_phone.line_user_id = user_id
-                existing_by_phone.created_at = datetime.now()
-                db.session.commit()
-            else:
-                updated = False
-                if not existing_by_phone.name and data.get("name"):
-                    existing_by_phone.name = data["name"]
-                    updated = True
-                if not existing_by_phone.line_id and data.get("line_id"):
-                    existing_by_phone.line_id = data["line_id"]
-                    updated = True
-                if not existing_by_phone.line_user_id:
-                    existing_by_phone.line_user_id = user_id
-                    updated = True
-                if updated:
-                    db.session.commit()
+            _fill_fields(existing_by_phone, data, fields, user_id, reverify)
+            existing_by_phone.created_at = _now() if reverify else existing_by_phone.created_at
+            _safe_commit()
             return existing_by_phone, False
 
-    # 若仍無符合的紀錄，嘗試新增；用 try/except 處理 race condition 導致的 unique violation
     record = Whitelist(
         phone=phone,
         name=data.get("name"),
         line_id=data.get("line_id"),
         line_user_id=user_id,
-        created_at=datetime.now()
+        created_at=_now()
     )
     db.session.add(record)
     try:
-        db.session.commit()
+        _safe_commit()
         is_new = True
         return record, is_new
     except IntegrityError:
-        # 可能因為同時插入相同 phone 而衝突，回滾並嘗試以 phone 找回那筆紀錄再更新
         db.session.rollback()
-        fallback = None
-        if phone:
-            fallback = Whitelist.query.filter_by(phone=phone).first()
+        logging.warning("IntegrityError on insert Whitelist, trying fallback by phone")
+        fallback = Whitelist.query.filter_by(phone=phone).first() if phone else None
         if fallback:
-            if reverify:
-                fallback.name = data.get("name", fallback.name)
-                fallback.line_id = data.get("line_id", fallback.line_id)
-                fallback.line_user_id = user_id
-                fallback.created_at = datetime.now()
-                db.session.commit()
-            else:
-                updated = False
-                if not fallback.name and data.get("name"):
-                    fallback.name = data["name"]
-                    updated = True
-                if not fallback.line_id and data.get("line_id"):
-                    fallback.line_id = data["line_id"]
-                    updated = True
-                if not fallback.line_user_id:
-                    fallback.line_user_id = user_id
-                    updated = True
-                if updated:
-                    db.session.commit()
+            _fill_fields(fallback, data, fields, user_id, reverify)
+            fallback.created_at = _now() if reverify else fallback.created_at
+            _safe_commit()
             return fallback, False
-        # 若找不到 fallback，重新拋出例外
         raise

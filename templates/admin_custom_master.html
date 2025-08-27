@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="utf-8">
+    <title>後台管理</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/admin_custom.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark">
+  <a class="navbar-brand" href="/admin/"><i class="fa fa-server"></i> 後台管理</a>
+  <div class="collapse navbar-collapse">
+    <ul class="navbar-nav mr-auto">
+      <li class="nav-item"><a class="nav-link" href="/admin/"><i class="fa fa-home"></i> Home</a></li>
+      <li class="nav-item">
+        <form class="form-inline" action="/search" method="get" style="display:inline-block;">
+          <input class="form-control mr-sm-2" type="search" name="q" placeholder="搜尋..." aria-label="Search">
+          <button class="btn btn-outline-primary my-2 my-sm-0" type="submit"><i class="fa fa-search"></i></button>
+        </form>
+      </li>
+      <li class="nav-item"><a class="nav-link" href="/admin/whitelist/"><i class="fa fa-list"></i> 白名單</a></li>
+      <li class="nav-item"><a class="nav-link" href="/admin/blacklist/"><i class="fa fa-ban"></i> 黑名單</a></li>
+      <li class="nav-item"><a class="nav-link" href="/admin/coupon/"><i class="fa fa-ticket"></i> 抽獎券</a></li>
+    </ul>
+  </div>
+</nav>
+<div class="container-fluid admin-panel content mt-4">
+    {% block body %}{% endblock %}
+</div>
+</body>
+</html>

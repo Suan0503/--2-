@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="utf-8">
+    <title>搜尋結果</title>
+    <link rel="stylesheet" href="/static/admin_custom.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+</head>
+<body>
+<div class="container mt-4">
+    <h2>搜尋結果</h2>
+    <form class="form-inline mb-3" action="/search" method="get">
+        <input class="form-control mr-2" type="search" name="q" value="{{ q }}" placeholder="搜尋...">
+        <button class="btn btn-primary" type="submit">搜尋</button>
+    </form>
+    {% if results %}
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>類型</th>
+                <th>手機/帳號/編號</th>
+                <th>姓名/暱稱</th>
+                <th>LINE ID/抽獎券編號/金額</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for r in results %}
+            <tr>
+                <td>{{ r.type }}</td>
+                <td>{{ r.phone or r.line_user_id or r.report_no or '-' }}</td>
+                <td>{{ r.name or '-' }}</td>
+                <td>{{ r.line_id or r.report_no or r.amount or '-' }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>查無資料</p>
+    {% endif %}
+</div>
+</body>
+</html>
