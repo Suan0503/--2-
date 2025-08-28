@@ -13,3 +13,5 @@ opencv-python-headless
 numpy
 gunicorn
 wtforms==2.3.3
+
+redis

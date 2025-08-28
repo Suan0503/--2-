@@ -6,6 +6,14 @@ from linebot.models import (
 from extensions import handler, line_bot_api, db
 from models import Blacklist, Whitelist
 from utils.temp_users import get_temp_user, set_temp_user, pop_temp_user
+
+# 補助：取得所有暫存用戶（僅限 dict 模式）
+def get_all_temp_users():
+    try:
+        from utils.temp_users import temp_users
+        return temp_users.items()
+    except Exception:
+        return []
 from hander.admin import ADMIN_IDS
 from utils.menu_helpers import reply_with_menu
 from utils.db_utils import update_or_create_whitelist_from_data
@@ -224,7 +232,7 @@ def handle_text(event):
                 admin_manual_flow.pop(user_id, None)
                 return
             target_user_id = None
-            for uid, data in temp_users.items():
+            for uid, data in get_all_temp_users():
                 if data.get("phone") and normalize_phone(data.get("phone")) == normalize_phone(phone):
                     target_user_id = uid
                     break
@@ -307,7 +315,7 @@ def handle_text(event):
         return
 
     if user_text == "重新驗證":
-        temp_users[user_id] = {"step": "waiting_phone", "name": display_name, "reverify": True}
+        set_temp_user(user_id, {"step": "waiting_phone", "name": display_name, "reverify": True})
         reply_basic(event, "請輸入您的手機號碼（09開頭）開始重新驗證～")
         return
 
@@ -407,7 +415,8 @@ def handle_text(event):
 @handler.add(MessageEvent, message=ImageMessage)
 def handle_image(event):
     user_id = event.source.user_id
-    if user_id not in temp_users or temp_users[user_id].get("step") != "waiting_screenshot":
+    tu = get_temp_user(user_id)
+    if not tu or tu.get("step") != "waiting_screenshot":
         reply_with_reverify(event, "請先完成前面步驟後再上傳截圖唷～")
         return
 
@@ -419,7 +428,7 @@ def handle_image(event):
         for chunk in message_content.iter_content():
             f.write(chunk)
 
-    expected_line_id = (temp_users[user_id].get("line_id") or "").strip()
+    expected_line_id = (tu.get("line_id") or "").strip()
     try:
         image = Image.open(temp_path)
         ocr_text = pytesseract.image_to_string(image)
@@ -427,11 +436,11 @@ def handle_image(event):
 
         def fast_pass():
             tz = pytz.timezone("Asia/Taipei")
-            data = temp_users[user_id]
+            data = tu
             now = datetime.now(tz)
             data["date"] = now.strftime("%Y-%m-%d")
             record, _ = update_or_create_whitelist_from_data(
-                data, user_id, reverify=temp_users[user_id].get("reverify", False)
+                data, user_id, reverify=tu.get("reverify", False)
             )
             reply = (
                 f"📱 {record.phone}\n"
@@ -442,7 +451,7 @@ def handle_image(event):
                 f"🌟 加入密碼：ming666"
             )
             reply_with_menu(event.reply_token, reply)
-            temp_users.pop(user_id, None)
+            pop_temp_user(user_id)
 
         # 修正：用 .strip().lower() 強化容錯
         if expected_line_id.strip().lower() in ["尚未設定", "未設定", "無", "none", "not set"]:
@@ -469,7 +478,8 @@ def handle_image(event):
             "請選擇：重新上傳 / 重新輸入LINE ID / 重新驗證（從頭）。"
             f"{preview_note}"
         )
-        temp_users[user_id]["step"] = "waiting_confirm_after_ocr"
+        tu["step"] = "waiting_confirm_after_ocr"
+        set_temp_user(user_id, tu)
         text_msg = TextSendMessage(
             text=warn,
             quick_reply=make_qr(
