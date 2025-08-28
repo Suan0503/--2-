@@ -614,7 +614,7 @@ def handle_post_ocr_confirm(event):
                 f"       個人編號： (驗證後產生)\n"
                 f"🔗 LINE ID：{pending.get('line_id')}\n"
                 f"🕒 {datetime.now(tz).strftime('%Y/%m/%d %H:%M:%S')}\n\n"
-                "此為管理員手動驗證，如無誤請輸入 1 完成驗證。"
+                "此為管理員手動驗證，如無誤按「完成驗證」。"
             )
             line_bot_api.reply_message(
                 event.reply_token,
