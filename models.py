@@ -3,7 +3,7 @@ from datetime import datetime
 
 class Whitelist(db.Model):
     __tablename__ = "whitelist"
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     date = db.Column(db.String(20))
     phone = db.Column(db.String(20), unique=True)
@@ -14,7 +14,7 @@ class Whitelist(db.Model):
 
 class Blacklist(db.Model):
     __tablename__ = "blacklist"
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     date = db.Column(db.String(20))
     phone = db.Column(db.String(20), unique=True)
@@ -23,7 +23,7 @@ class Blacklist(db.Model):
 
 class Coupon(db.Model):
     __tablename__ = "coupon"
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     line_user_id = db.Column(db.String(255))
     date = db.Column(db.String(20))
     amount = db.Column(db.Integer)
