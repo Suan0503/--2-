@@ -58,6 +58,35 @@ def entrypoint(event):
     # 驗證資訊
     if user_text == "驗證資訊":
         tz = pytz.timezone("Asia/Taipei")
+        now = datetime.now(tz)
+        today_str = now.strftime('%Y-%m-%d')
+        pre_event_end = datetime(2025, 9, 10, tzinfo=tz)
+        img_url = "https://raw.githubusercontent.com/Suan0503/Test_Mod/refs/heads/main/static/20250904.jpg"  # 你的前導圖網址
+        # 9/1~9/9 每日首次跳前導圖
+        if now < pre_event_end:
+            if user_id not in temp_users or temp_users[user_id].get('pre_event_shown') != today_str:
+                from linebot.models import ImageSendMessage
+                if user_id not in temp_users:
+                    temp_users[user_id] = {}
+                temp_users[user_id]['pre_event_shown'] = today_str
+                user = Whitelist.query.filter_by(line_user_id=user_id).first()
+                if user:
+                    reply = (
+                        f"📱 {user.phone}\n"
+                        f"🌸 暱稱：{user.name or '未登記'}\n"
+                        f"       個人編號：{user.id}\n"
+                        f"🔗 LINE ID：{user.line_id or '未登記'}\n"
+                        f"🕒 {user.created_at.astimezone(tz).strftime('%Y/%m/%d %H:%M:%S')}\n"
+                        f"✅ 驗證成功，歡迎加入茗殿\n"
+                        f"🌟 加入密碼：ming666"
+                    )
+                else:
+                    reply = "查無你的驗證資訊，請先完成驗證流程。"
+                line_bot_api.reply_message(event.reply_token, [
+                    ImageSendMessage(original_content_url=img_url, preview_image_url=img_url),
+                    TextSendMessage(text=reply)
+                ])
+                return
         user = Whitelist.query.filter_by(line_user_id=user_id).first()
         if user:
             reply = (
@@ -144,9 +173,79 @@ def entrypoint(event):
     # 主選單/功能選單/查詢規則/活動快訊
     if user_text in [
         "主選單", "功能選單", "選單", "menu", "Menu",
-        "查詢規則", "規則查詢", "活動快訊"
+        "查詢規則", "規則查詢"
     ]:
+        tz = pytz.timezone("Asia/Taipei")
+        now = datetime.now(tz)
+        today_str = now.strftime('%Y-%m-%d')
+        # 第二活動前導圖：9/1~9/9，每日首次顯示
+        pre_event_end = datetime(2025, 9, 10, tzinfo=tz)
+        img_url = "https://raw.githubusercontent.com/Suan0503/Test_Mod/refs/heads/main/static/20250904.jpg"  # 請換成你的前導圖網址
+        if now < pre_event_end:
+            # 檢查 temp_users 是否已記錄今日已顯示
+            if user_id not in temp_users or temp_users[user_id].get('pre_event_shown') != today_str:
+                from linebot.models import ImageSendMessage
+                # 記錄今日已顯示
+                if user_id not in temp_users:
+                    temp_users[user_id] = {}
+                temp_users[user_id]['pre_event_shown'] = today_str
+                line_bot_api.reply_message(event.reply_token, [
+                    ImageSendMessage(original_content_url=img_url, preview_image_url=img_url),
+                    TextSendMessage(text="主選單如下：")
+                ])
+                return
         reply_with_menu(event.reply_token)
+        return
+
+    # 活動快訊：多活動期間判斷
+    if user_text == "活動快訊":
+        tz = pytz.timezone("Asia/Taipei")
+        now = datetime.now(tz)
+        # 第一活動：9/1 ~ 9/30
+        act1_start = datetime(2025, 9, 1, tzinfo=tz)
+        act1_end = datetime(2025, 9, 30, 23, 59, 59, tzinfo=tz)
+        # 第二活動：9/10 ~ 9/30
+        act2_start = datetime(2025, 9, 10, tzinfo=tz)
+        act2_end = datetime(2025, 9, 30, 23, 59, 59, tzinfo=tz)
+
+        msg = ""
+        img_url = None
+        # 第一活動
+        if act1_start <= now <= act1_end:
+            msg += "🌸 茗殿好鄰居 1+1 活動 🌸\n"
+            msg += "⏰ 即日起～9月底\n\n"
+            msg += "💌 邀好友‧齊享優惠\n"
+            msg += "✔️ 邀請好友加入並完成驗證：\n"
+            msg += "\t• 邀請人 🎁 折價券 200 元\n"
+            msg += "\t• 受邀人 🎁 折價券 100 元\n\n"
+            msg += "👭 一起來更划算！\n"
+            msg += "當日兩人同行預約 👉 現折 100 元\n\n"
+            msg += "⚡溫馨提醒：\n領取折價券時，記得主動告知活動喔！"
+            img_url = "https://raw.githubusercontent.com/Suan0503/Test_Mod/refs/heads/main/static/%E5%A5%BD%E9%84%B0%E5%B1%851%2B1.png"  # 請換成好鄰居1+1.png的實際網址
+
+        # 第二活動
+        if act2_start <= now <= act2_end:
+            if msg:
+                msg += "\n\n"
+            msg += "🏫✨ 茗殿學院祭 — 少女的邀請 ✨🏫\n"
+            msg += "⏰ 活動期間：9/10～9/30\n\n"
+            msg += "🎀 妹妹們換上 清純校服，帶來滿滿青春氣息 💕\n"
+            msg += "🎁 特別準備了 祭典限定特典，\n只送給參加的有緣人！（數量有限，送完為止）\n\n"
+            msg += "🌸 在這個屬於學院的季節，\n快來和妹妹們留下專屬回憶吧！"
+
+        if not msg:
+            msg = "🌟 目前無進行中活動，敬請期待！"
+            reply_with_menu(event.reply_token, msg)
+        else:
+            # 若有圖片網址，直接用 ImageSendMessage 顯示圖片
+            if img_url:
+                from linebot.models import ImageSendMessage
+                line_bot_api.reply_message(event.reply_token, [
+                    TextSendMessage(text=msg),
+                    ImageSendMessage(original_content_url=img_url, preview_image_url=img_url)
+                ])
+            else:
+                reply_with_menu(event.reply_token, msg)
         return
 
     # 呼叫管理員

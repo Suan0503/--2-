@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="utf-8">
+    <title>手動驗證</title>
+    <link rel="stylesheet" href="/static/magic_academy.css">
+</head>
+<body>
+    <a href="https://web-production-9351.up.railway.app/admin/" style="position: absolute; left: 20px; top: 20px; z-index: 999; font-size: 18px; background: #fff3; padding: 6px 16px; border-radius: 8px; text-decoration: none; color: #333;">回主頁</a>
+<div class="container" style="max-width:500px;margin:auto;padding:2em;">
+    <h2 class="magic-effect mb-4">手動驗證表單</h2>
+    <form action="/manual_verify" method="post" style="background:rgba(44,34,68,0.85);border-radius:12px;padding:1.5em;box-shadow:0 4px 24px #1a2337;">
+        <label for="nickname">暱稱：</label>
+        <input type="text" name="nickname" id="nickname" required><br><br>
+        <label for="phone">手機號碼：</label>
+        <input type="text" name="phone" id="phone" required><br><br>
+        <label for="line_id">LINE ID：</label>
+        <input type="text" name="line_id" id="line_id" required><br><br>
+        <button type="submit" class="btn magic-effect">產生驗證碼</button>
+    </form>
+    {% if code %}
+    <div class="card panel mt-4">
+        <h4>請將此驗證碼提供給用戶：</h4>
+        <div style="font-size:2em;color:#ffe082;">{{ code }}</div>
+    </div>
+    {% endif %}
+    {% if success %}
+    <div class="card panel mt-4">
+        <h4 style="color:#4caf50;">驗證成功！已加入白名單。</h4>
+    </div>
+    {% endif %}
+</div>
+</body>
+</html>

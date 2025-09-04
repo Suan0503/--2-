@@ -43,6 +43,7 @@ db.init_app(app)
 
 # Blueprint 註冊
 
+
 app.register_blueprint(message_bp)
 
 # 即時班表更新頁面

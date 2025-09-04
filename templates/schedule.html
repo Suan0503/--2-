@@ -10,20 +10,60 @@
   .time-select, .duration-select { width: 90px; }
   .remove-time-btn { background: #f04747; color: #fff; border: none; border-radius: 6px; padding: 2px 8px; cursor: pointer; }
   .add-time-btn, .sort-time-btn { margin: 8px 4px; padding: 4px 12px; border-radius: 6px; border: none; background: #4f8cff; color: #fff; cursor: pointer; }
-</style>
-
-<div class="schedule-main" style="display:flex;gap:32px;padding:32px 0;">
-  <div style="flex:1;">
-    <h3>排班表</h3>
-    <table class="schedule-table" id="schedule-table">
-      <thead>
-        <tr>
-          <th>妹妹<br><small>（名稱＋房號）</small></th>
-          <th>語言</th>
-          <th>國籍</th>
-          <th>時間
-            <button class="sort-time-btn" onclick="sortAllTimes()">刷新排序</button>
-          </th>
+<div style="display:flex;">
+  <!-- 左半邊表單 -->
+  <div style="width:40%;padding:2em;">
+    <form action="/schedule/add" method="post" style="background:rgba(44,34,68,0.85);border-radius:12px;padding:1.5em;box-shadow:0 4px 24px #1a2337;">
+      <h4 style="color:#ffe082;">新增班表</h4>
+      <label for="sister">選擇妹妹：</label>
+      <select name="sister" id="sister" onchange="document.getElementById('new_sister').style.display = this.value === '新增' ? 'block' : 'none';" required>
+        {% for name in sisters %}
+        <option value="{{ name }}">{{ name }}</option>
+        {% endfor %}
+        <option value="新增">＋ 新增妹妹</option>
+      </select>
+      <input type="text" name="new_sister" id="new_sister" placeholder="請輸入新妹妹名稱" style="display:none;margin-top:8px;">
+      <br><br>
+      <label for="hour">時段：</label>
+      <select name="hour" id="hour" required>
+        {% for h in range(0,24) %}
+        <option value="{{ '%02d' % h }}">{{ '%02d' % h }}</option>
+        {% endfor %}
+      </select>
+      ：
+      <select name="minute" id="minute" required>
+        <option value="00">00</option>
+        <option value="30">30</option>
+      </select>
+      <br><br>
+      <label for="plan">方案：</label>
+      <select name="plan" id="plan" required>
+        <option value="40">40</option>
+        <option value="60">60</option>
+        <option value="90">90</option>
+      </select>
+      <br><br>
+      <button type="submit" class="btn magic-effect">新增班表</button>
+    </form>
+  </div>
+  <!-- 右半邊班表 -->
+  <div style="width:60%;padding:2em;">
+    <table style="width:100%;background:rgba(44,34,68,0.85);border-radius:12px;color:#ffe082;">
+      <tr>
+        <th>妹妹</th>
+        <th>時段</th>
+        <th>方案</th>
+      </tr>
+      {% for row in schedule %}
+      <tr>
+        <td>{{ row['妹妹'] }}</td>
+        <td>{{ row['時段'] }}</td>
+        <td>{{ row['方案'] }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+</div>
         </tr>
       </thead>
       <tbody id="girl-rows">

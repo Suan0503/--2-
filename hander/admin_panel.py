@@ -25,9 +25,25 @@ class ModernModelView(ModelView):
 
 class WhitelistModelView(ModernModelView):
     column_searchable_list = ['phone', 'line_id', 'name']
+    column_labels = {
+        'created_at': '建立時間',
+        'date': '日期',
+        'phone': '手機',
+        'reason': '原因',
+        'name': '姓名',
+        'line_id': 'LINE ID',
+        'line_user_id': 'LINE用戶ID'
+    }
 
 class BlacklistModelView(ModernModelView):
     column_searchable_list = ['phone', 'name']
+    column_labels = {
+        'created_at': '建立時間',
+        'date': '日期',
+        'phone': '手機',
+        'reason': '原因',
+        'name': '姓名'
+    }
 
     def _search(self, query, search_term):
         # 手機欄位自動補齊 10 碼
@@ -41,6 +57,15 @@ class BlacklistModelView(ModernModelView):
 
 class CouponModelView(ModernModelView):
     column_searchable_list = ['line_user_id', 'report_no', 'type', 'date']
+    column_labels = {
+        'id': '編號',
+        'line_user_id': 'LINE用戶ID',
+        'date': '日期',
+        'amount': '金額',
+        'created_at': '建立時間',
+        'report_no': '抽獎券編號',
+        'type': '來源類型'
+    }
 
     def render(self, template, **kwargs):
         # 注入自訂按鈕
