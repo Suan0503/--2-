@@ -185,13 +185,14 @@ def entrypoint(event):
             # 檢查 temp_users 是否已記錄今日已顯示
             if user_id not in temp_users or temp_users[user_id].get('pre_event_shown') != today_str:
                 from linebot.models import ImageSendMessage
+                from utils.menu import get_menu_carousel
                 # 記錄今日已顯示
                 if user_id not in temp_users:
                     temp_users[user_id] = {}
                 temp_users[user_id]['pre_event_shown'] = today_str
                 line_bot_api.reply_message(event.reply_token, [
-                    ImageSendMessage(original_content_url=img_url, preview_image_url=img_url),
-                    TextSendMessage(text="主選單如下：")
+                    get_menu_carousel(),
+                    ImageSendMessage(original_content_url=img_url, preview_image_url=img_url)
                 ])
                 return
         reply_with_menu(event.reply_token)
