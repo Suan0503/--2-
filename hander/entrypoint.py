@@ -205,9 +205,9 @@ def entrypoint(event):
         # 第一活動：9/1 ~ 9/30
         act1_start = datetime(2025, 9, 1, tzinfo=tz)
         act1_end = datetime(2025, 9, 30, 23, 59, 59, tzinfo=tz)
-    # 第二活動：9/10 上午10:00 ~ 9/30
-    act2_start = datetime(2025, 9, 10, 10, 0, 0, tzinfo=tz)
-    act2_end = datetime(2025, 9, 30, 23, 59, 59, tzinfo=tz)
+        # 第二活動：9/10 ~ 9/30
+        act2_start = datetime(2025, 9, 10, tzinfo=tz)
+        act2_end = datetime(2025, 9, 30, 23, 59, 59, tzinfo=tz)
 
         msg = ""
         img_url = None
