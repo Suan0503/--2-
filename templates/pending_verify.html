@@ -18,39 +18,52 @@
                 <span aria-hidden="true">&times;</span>
               </button>
             </div>
+            <script>
+              setTimeout(function(){
+                window.location.href = window.location.pathname;
+              }, 1200);
+            </script>
           {% endfor %}
         </div>
       {% endif %}
     {% endwith %}
-    {% if users %}
-    <table class="table table-bordered bg-white">
-        <thead class="thead-dark">
-            <tr>
-                <th>暱稱</th>
-                <th>手機</th>
-                <th>LINE ID</th>
-                <th>操作</th>
-            </tr>
-        </thead>
-        <tbody>
-        {% for u in users %}
-            <tr>
-                <td>{{ u.nickname }}</td>
-                <td>{{ u.phone }}</td>
-                <td>{{ u.line_id }}</td>
-                <td>
-                    <form method="post" style="display:inline;">
-                        <input type="hidden" name="user_id" value="{{ u.user_id }}">
-                        <button type="submit" class="btn btn-success btn-sm">通過驗證</button>
-                    </form>
-                </td>
-            </tr>
-        {% endfor %}
-        </tbody>
-    </table>
-    {% else %}
-    <div class="alert alert-info">目前沒有卡住的暫存驗證用戶。</div>
-    {% endif %}
+  {% if users %}
+  <table class="table table-bordered bg-white">
+    <thead class="thead-dark">
+      <tr>
+        <th>暱稱</th>
+        <th>手機</th>
+        <th>LINE ID</th>
+        <th>LINE用戶ID</th>
+        <th>操作</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for u in users %}
+      <tr>
+    <td>{{ u.nickname }}</td>
+    <td>{{ u.phone }}</td>
+    <td>{{ u.line_id }}</td>
+    <td>{{ u.line_user_id if u.line_user_id else '（缺少）' }}</td>
+    <td>
+      {% if u.line_user_id %}
+      <form method="post" style="display:inline;">
+      <input type="hidden" name="user_id" value="{{ u.user_id }}">
+      <button type="submit" class="btn btn-success btn-sm">通過驗證</button>
+      </form>
+      {% else %}
+      <button class="btn btn-secondary btn-sm" disabled>缺少 LINE用戶ID</button>
+      {% endif %}
+    </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <a href="/admin/" class="btn btn-outline-primary mt-3">返回主選單</a>
+  {% else %}
+  <div class="alert alert-info">目前沒有卡住的暫存驗證用戶。</div>
+  <a href="/admin/" class="btn btn-outline-primary mt-3">返回主選單</a>
+  {% endif %}
 </div>
 </body>
 </html>

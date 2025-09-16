@@ -1,9 +1,11 @@
+
 import sys
 import os
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))  # ✅ 確保 handler 可被 import
 
 from flask import Flask, render_template, request
 from dotenv import load_dotenv
+from sqlalchemy import text
 
 load_dotenv()
 
@@ -62,7 +64,7 @@ with app.app_context():
 @app.route("/")
 def home():
     try:
-        db.session.execute("SELECT 1")
+        db.session.execute(text("SELECT 1"))
         db_status = "資料庫連線正常"
     except Exception as e:
         db_status = "資料庫連線異常: " + str(e)

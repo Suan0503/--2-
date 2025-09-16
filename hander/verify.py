@@ -197,6 +197,9 @@ def admin_reject_manual_verify(admin_id, target_user_id):
 def handle_text(event):
     user_id = event.source.user_id
     user_text = (event.message.text or "").strip()
+    logging.info(f"[handle_text] user_id={user_id} 收到 user_text={user_text}")
+    user_id = event.source.user_id
+    user_text = (event.message.text or "").strip()
     tz = pytz.timezone("Asia/Taipei")
 
     try:
@@ -315,11 +318,27 @@ def handle_text(event):
         return
 
     if user_text == "重新驗證":
-        set_temp_user(user_id, {"step": "waiting_phone", "name": display_name, "reverify": True})
+        logging.info(f"[handle_text] 進入重新驗證分支 user_id={user_id}")
+        set_temp_user(user_id, {"step": "waiting_phone", "name": display_name, "reverify": True, "user_id": user_id})
         reply_basic(event, "請輸入您的手機號碼（09開頭）開始重新驗證～")
         return
 
+    phone_candidate = normalize_phone(user_text)
+    if not get_temp_user(user_id) and re.match(r"^09\d{8}$", phone_candidate):
+        logging.info(f"[handle_text] 進入手機號分支 user_id={user_id} phone={phone_candidate}")
+        if Blacklist.query.filter_by(phone=phone_candidate).first():
+            reply_basic(event, "❌ 請聯絡管理員，無法自動通過驗證流程。❌")
+            return
+        owner = Whitelist.query.filter_by(phone=phone_candidate).first()
+        if owner and owner.line_user_id and owner.line_user_id != user_id:
+            reply_basic(event, "❌ 此手機已綁定其他帳號，請聯絡客服協助。")
+            return
+        set_temp_user(user_id, {"step": "waiting_lineid", "name": display_name, "phone": phone_candidate, "user_id": user_id})
+        reply_basic(event, "✅ 手機號已登記～請輸入您的 LINE ID（未設定請輸入：尚未設定）")
+        return
+
     if re.match(r"^\d{8}$", user_text):
+        logging.info(f"[handle_text] 進入驗證碼分支 user_id={user_id} code={user_text}")
         pending = manual_verify_pending.get(user_id)
         pending_key = user_id
         if not pending:
@@ -352,22 +371,10 @@ def handle_text(event):
                 )
             )
             return
-    phone_candidate = normalize_phone(user_text)
-    if not get_temp_user(user_id) and re.match(r"^09\d{8}$", phone_candidate):
-        if Blacklist.query.filter_by(phone=phone_candidate).first():
-            reply_basic(event, "❌ 請聯絡管理員，無法自動通過驗證流程。❌")
-            return
-        owner = Whitelist.query.filter_by(phone=phone_candidate).first()
-        if owner and owner.line_user_id and owner.line_user_id != user_id:
-            reply_basic(event, "❌ 此手機已綁定其他帳號，請聯絡客服協助。")
-            return
-
-        set_temp_user(user_id, {"step": "waiting_lineid", "name": display_name, "phone": phone_candidate})
-        reply_basic(event, "✅ 手機號已登記～請輸入您的 LINE ID（未設定請輸入：尚未設定）")
-        return
 
     tu = get_temp_user(user_id)
     if tu and tu.get("step") == "waiting_phone":
+        logging.info(f"[handle_text] 進入 waiting_phone 分支 user_id={user_id} tu={tu}")
         phone = normalize_phone(user_text)
         if not re.match(r"^09\d{8}$", phone):
             reply_basic(event, "⚠️ 請輸入正確的手機號碼（09開頭共10碼）")
@@ -380,21 +387,23 @@ def handle_text(event):
         if owner and owner.line_user_id and owner.line_user_id != user_id:
             reply_basic(event, "❌ 此手機已綁定其他帳號，請聯絡客服協助。")
             return
-
         tu["phone"] = phone
         tu["step"] = "waiting_lineid"
+        tu["user_id"] = user_id
         set_temp_user(user_id, tu)
         reply_basic(event, "✅ 手機號已登記～請輸入您的 LINE ID（未設定請輸入：尚未設定）")
         return
 
     tu = get_temp_user(user_id)
     if tu and tu.get("step") == "waiting_lineid":
+        logging.info(f"[handle_text] 進入 waiting_lineid 分支 user_id={user_id} tu={tu}")
         line_id = user_text.strip()
         if not line_id:
             reply_basic(event, "⚠️ 請輸入有效的 LINE ID（或輸入：尚未設定）")
             return
         tu["line_id"] = line_id
         tu["step"] = "waiting_screenshot"
+        tu["user_id"] = user_id
         set_temp_user(user_id, tu)
         reply_basic(
             event,
@@ -417,7 +426,14 @@ def handle_text(event):
         return
 
     if not get_temp_user(user_id):
-        set_temp_user(user_id, {"step": "waiting_phone", "name": display_name})
+        logging.info(f"[handle_text] 進入初始分支 user_id={user_id}")
+        set_temp_user(user_id, {
+            "step": "waiting_phone",
+            "name": display_name,
+            "nickname": display_name,
+            "user_id": user_id,
+            "line_user_id": user_id
+        })
         reply_basic(event, "歡迎～請直接輸入手機號碼（09開頭）進行驗證。")
         return
 
