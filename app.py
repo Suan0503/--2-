@@ -45,6 +45,8 @@ db.init_app(app)
 
 
 app.register_blueprint(message_bp)
+from routes.pending_verify import pending_bp
+app.register_blueprint(pending_bp)
 
 # 即時班表更新頁面
 @app.route("/admin/schedule/")

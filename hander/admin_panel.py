@@ -54,6 +54,17 @@ class BlacklistModelView(ModernModelView):
             elif len(term) == 9:
                 term = '0' + term
         return super()._search(query, term)
+    
+        def on_model_change(self, form, model, is_created):
+            from flask import flash
+            try:
+                super().on_model_change(form, model, is_created)
+                if is_created:
+                    flash('新增黑名單成功！', 'success')
+                else:
+                    flash('黑名單資料已更新！', 'info')
+            except Exception as e:
+                flash(f'操作失敗：{str(e)}', 'danger')
 
 class CouponModelView(ModernModelView):
     column_searchable_list = ['line_user_id', 'report_no', 'type', 'date']
