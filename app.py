@@ -61,7 +61,8 @@ with app.app_context():
     db.create_all()
     init_admin(app)
 
-@app.route("/")
+
+@app.route("/home")
 def home():
     try:
         db.session.execute(text("SELECT 1"))
@@ -69,6 +70,11 @@ def home():
     except Exception as e:
         db_status = "資料庫連線異常: " + str(e)
     return f"LINE Bot 正常運作中～🍵\n{db_status}"
+
+@app.route("/")
+def index():
+    from flask import redirect
+    return redirect("/home")
 
 
 # 搜尋功能

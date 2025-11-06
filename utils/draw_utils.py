@@ -8,16 +8,18 @@ def draw_coupon():
     執行抽獎，根據機率回傳金額
     """
     chance = random.random()
-    if chance < 0.000001:
-        return 500
-    elif chance < 0.003:
-        return 300
-    elif chance < 0.07:
-        return 200
-    elif chance < 0.42:
-        return 100
+    if chance < 0.7:
+        return 0  # 未中獎 70%
     else:
-        return 0
+        prize_chance = (chance - 0.7) / 0.3  # 0~1之間
+        if prize_chance < 0.01:
+            return 500  # 1%
+        elif prize_chance < 0.03:
+            return 300  # 2%
+        elif prize_chance < 0.08:
+            return 200  # 5%
+        else:
+            return 100  # 95%
 
 def has_drawn_today(user_id, CouponModel):
     """

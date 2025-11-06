@@ -54,17 +54,17 @@ class BlacklistModelView(ModernModelView):
             elif len(term) == 9:
                 term = '0' + term
         return super()._search(query, term)
-    
-        def on_model_change(self, form, model, is_created):
-            from flask import flash
-            try:
-                super().on_model_change(form, model, is_created)
-                if is_created:
-                    flash('新增黑名單成功！', 'success')
-                else:
-                    flash('黑名單資料已更新！', 'info')
-            except Exception as e:
-                flash(f'操作失敗：{str(e)}', 'danger')
+
+    def on_model_change(self, form, model, is_created):
+        from flask import flash
+        try:
+            super().on_model_change(form, model, is_created)
+            if is_created:
+                flash('新增黑名單成功！', 'success')
+            else:
+                flash('黑名單資料已更新！', 'info')
+        except Exception as e:
+            flash(f'操作失敗：{str(e)}', 'danger')
 
 class CouponModelView(ModernModelView):
     column_searchable_list = ['line_user_id', 'report_no', 'type', 'date']
@@ -88,7 +88,7 @@ class CouponModelView(ModernModelView):
         return super().render(template, **kwargs)
 
 def init_admin(app):
-    admin = Admin(app, name='後台管理', template_mode='bootstrap4', base_template='admin_custom_master.html')
+    admin = Admin(app, name='後台管理')
     admin.add_view(WhitelistModelView(Whitelist, db.session, name='<i class="fa fa-list"></i> 白名單', endpoint='whitelist'))
     admin.add_view(BlacklistModelView(Blacklist, db.session, name='<i class="fa fa-ban"></i> 黑名單', endpoint='blacklist'))
     admin.add_view(CouponModelView(Coupon, db.session, name='<i class="fa fa-ticket"></i> 抽獎券', endpoint='coupon'))
