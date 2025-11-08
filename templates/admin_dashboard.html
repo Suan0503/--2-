@@ -1,0 +1,257 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理者ダッシュボード</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&family=Zen+Maru+Gothic:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #f8f6f1 0%, #fce4ec 100%);
+            font-family: 'Zen Maru Gothic', 'Noto Sans JP', '微軟正黑體', sans-serif;
+            color: #444;
+            margin: 0;
+            padding: 0;
+        }
+    .flash-wrapper {max-width:900px;margin:24px auto 0 auto;}
+    .flash {background:#fff;padding:12px 18px;margin-bottom:10px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06);font-size:0.95rem;border-left:6px solid #64b5f6;}
+    .flash-success {border-left-color:#81c784;}
+    .flash-danger {border-left-color:#e57373;}
+    .flash-warning {border-left-color:#ffb74d;}
+    .flash-info {border-left-color:#64b5f6;}
+    .status-pending {color:#ffb74d;font-weight:700;}
+    .status-verified {color:#81c784;font-weight:700;}
+    .status-failed {color:#e57373;font-weight:700;}
+        .header {
+            background: #fff0f6;
+            padding: 32px 0 16px 0;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(220, 180, 200, 0.08);
+        }
+        .header h1 {
+            font-size: 2.4rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            color: #e57399;
+            margin: 0;
+        }
+        .dashboard {
+            max-width: 900px;
+            margin: 40px auto;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 32px;
+            justify-content: center;
+        }
+        .card {
+            background: #fff;
+            border-radius: 18px;
+            box-shadow: 0 4px 16px rgba(220, 180, 200, 0.12);
+            padding: 32px 28px;
+            min-width: 220px;
+            max-width: 260px;
+            text-align: center;
+            transition: box-shadow 0.2s;
+        }
+        .card:hover {
+            box-shadow: 0 8px 24px rgba(220, 180, 200, 0.18);
+        }
+        .card-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #ba68c8;
+            margin-bottom: 18px;
+        }
+        .card-btn {
+            display: inline-block;
+            background: linear-gradient(90deg, #f8bbd0 0%, #b2ebf2 100%);
+            color: #fff;
+            font-size: 1rem;
+            font-weight: 700;
+            border: none;
+            border-radius: 12px;
+            padding: 10px 32px;
+            margin-top: 8px;
+            box-shadow: 0 2px 8px rgba(220, 180, 200, 0.10);
+            cursor: pointer;
+            transition: background 0.2s;
+            text-decoration: none;
+        }
+        .card-btn:hover {
+            background: linear-gradient(90deg, #f48fb1 0%, #80deea 100%);
+        }
+        .footer {
+            text-align: center;
+            color: #aaa;
+            font-size: 0.95rem;
+            margin: 48px 0 16px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>管理者ダッシュボード</h1>
+        <div style="font-size:1.1rem;color:#888;margin-top:8px;">ようこそ、管理者さま</div>
+    </div>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+            <div class="flash-wrapper">
+                {% for category, msg in messages %}
+                    <div class="flash flash-{{ category }}">{{ msg }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        {% endwith %}
+    <div class="dashboard">
+        <div class="card" style="flex:1;min-width:320px;max-width:600px;text-align:left;">
+            <div class="card-title">白名單</div>
+            <!-- 查詢、新增表單 -->
+            <form method="get" action="/admin/whitelist/search" style="margin-bottom:10px;display:flex;gap:8px;">
+                <input type="text" name="q" placeholder="查詢手機/LINE ID/暱稱" style="flex:1;padding:6px 12px;border-radius:8px;border:1px solid #f8bbd0;">
+                <button type="submit" class="card-btn" style="padding:6px 18px;">查詢</button>
+            </form>
+            <form method="post" action="/admin/whitelist/add" style="margin-bottom:10px;display:flex;gap:8px;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="text" name="phone" placeholder="手機" required style="flex:1;padding:6px 12px;border-radius:8px;border:1px solid #b2ebf2;">
+                <input type="text" name="name" placeholder="暱稱" required style="flex:1;padding:6px 12px;border-radius:8px;border:1px solid #b2ebf2;">
+                <input type="text" name="line_id" placeholder="LINE ID" required style="flex:1;padding:6px 12px;border-radius:8px;border:1px solid #b2ebf2;">
+                <button type="submit" class="card-btn" style="padding:6px 18px;">新增</button>
+            </form>
+            <table style="width:100%;border-collapse:collapse;font-size:1rem;">
+                <thead>
+                    <tr style="background:#fce4ec;color:#ba68c8;">
+                        <th>手機</th>
+                        <th>暱稱</th>
+                        <th>LINE ID</th>
+                        <th>加入時間</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for w in whitelists[:20] %}
+                    <tr>
+                        <td>{{ w.phone }}</td>
+                        <td>{{ w.name }}</td>
+                        <td>{{ w.line_id }}</td>
+                        <td>{{ w.created_at.strftime('%Y/%m/%d %H:%M') }}</td>
+                        <td>
+                            <form method="post" action="/admin/whitelist/delete" style="display:inline;">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="phone" value="{{ w.phone }}">
+                                <button type="submit" class="card-btn" style="padding:2px 10px;font-size:0.9rem;background:#e57399;">刪除</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="card" style="flex:1;min-width:320px;max-width:600px;text-align:left;">
+            <div class="card-title">黑名單</div>
+            <!-- 查詢、新增表單 -->
+            <form method="get" action="/admin/blacklist/search" style="margin-bottom:10px;display:flex;gap:8px;">
+                <input type="text" name="q" placeholder="查詢手機/暱稱" style="flex:1;padding:6px 12px;border-radius:8px;border:1px solid #f8bbd0;">
+                <button type="submit" class="card-btn" style="padding:6px 18px;">查詢</button>
+            </form>
+            <form method="post" action="/admin/blacklist/add" style="margin-bottom:10px;display:flex;gap:8px;">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="text" name="phone" placeholder="手機" required style="flex:1;padding:6px 12px;border-radius:8px;border:1px solid #b2ebf2;">
+                <input type="text" name="name" placeholder="暱稱" required style="flex:1;padding:6px 12px;border-radius:8px;border:1px solid #b2ebf2;">
+                <input type="text" name="reason" placeholder="原因" required style="flex:1;padding:6px 12px;border-radius:8px;border:1px solid #b2ebf2;">
+                <button type="submit" class="card-btn" style="padding:6px 18px;">新增</button>
+            </form>
+            <table style="width:100%;border-collapse:collapse;font-size:1rem;">
+                <thead>
+                    <tr style="background:#fce4ec;color:#ba68c8;">
+                        <th>手機</th>
+                        <th>暱稱</th>
+                        <th>加入時間</th>
+                        <th>原因</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for b in blacklists[:20] %}
+                    <tr>
+                        <td>{{ b.phone }}</td>
+                        <td>{{ b.name }}</td>
+                        <td>{{ b.created_at.strftime('%Y/%m/%d %H:%M') }}</td>
+                        <td>{{ b.reason }}</td>
+                        <td>
+                            <form method="post" action="/admin/blacklist/delete" style="display:inline;">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="phone" value="{{ b.phone }}">
+                                <button type="submit" class="card-btn" style="padding:2px 10px;font-size:0.9rem;background:#e57399;">刪除</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="card" style="flex:1;min-width:320px;max-width:600px;text-align:left;">
+            <div class="card-title">待驗證名單</div>
+            <table style="width:100%;border-collapse:collapse;font-size:1rem;">
+                <thead>
+                    <tr style="background:#fce4ec;color:#ba68c8;">
+                        <th>手機</th>
+                        <th>LINE ID</th>
+                        <th>暱稱</th>
+                        <th>狀態</th>
+                        <th>建立時間</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for t in tempverifies[:20] %}
+                    <tr>
+                        <td>{{ t.phone }}</td>
+                        <td>{{ t.line_id }}</td>
+                        <td>{{ t.nickname }}</td>
+                        <td class="status-{{ t.status }}">{{ t.status }}</td>
+                        <td>{{ t.created_at.strftime('%Y/%m/%d %H:%M') }}</td>
+                        <td>
+                            <form method="post" action="/admin/tempverify/verify" style="display:inline;">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="id" value="{{ t.id }}">
+                                <button type="submit" class="card-btn" style="padding:2px 10px;font-size:0.9rem;background:#81c784;">通過驗證</button>
+                            </form>
+                            <form method="post" action="/admin/tempverify/delete" style="display:inline;">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="id" value="{{ t.id }}">
+                                <button type="submit" class="card-btn" style="padding:2px 10px;font-size:0.9rem;background:#e57399;">刪除</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <!-- 功能按鈕區塊 -->
+        <div class="card" style="min-width:220px;max-width:260px;text-align:center;">
+            <div class="card-title">手動審核</div>
+            <a href="/manual_verify" class="card-btn">進入</a>
+        </div>
+        <div class="card" style="min-width:220px;max-width:260px;text-align:center;">
+            <div class="card-title">待審核</div>
+            <a href="/pending_verify" class="card-btn">進入</a>
+        </div>
+        <div class="card" style="min-width:220px;max-width:260px;text-align:center;">
+            <div class="card-title">排程管理</div>
+            <a href="/schedule" class="card-btn">進入</a>
+        </div>
+        <div class="card" style="min-width:220px;max-width:260px;text-align:center;">
+            <div class="card-title">檢舉管理</div>
+            <a href="/report" class="card-btn">進入</a>
+        </div>
+        <div class="card" style="min-width:220px;max-width:260px;text-align:center;">
+            <div class="card-title">管理面板</div>
+            <a href="https://web-production-9351.up.railway.app/admin/home" class="card-btn">回首頁</a>
+        </div>
+    </div>
+    <div class="footer">
+        &copy; 2025 管理者ダッシュボード | 日系主題設計
+    </div>
+</body>
+</html>

@@ -1,611 +1,197 @@
-.top-nav-bar {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    gap: 16px;
-    background: linear-gradient(90deg, #e3f2fd 0%, #f8fcff 100%);
-    padding: 12px 0 12px 24px;
-    box-shadow: 0 2px 8px rgba(79,140,255,0.08);
-    border-bottom: 1px solid #d0e6ff;
-    margin-bottom: 12px;
-    z-index: 10;
-}
-/* 強制表格標準佈局，移除異常縮排/排列 */
-/* 表格美化與正常顯示 */
-table {
-    border-radius: 18px;
-    box-shadow: 0 2px 16px rgba(79,140,255,0.10);
-    border-collapse: collapse;
-    background: #e3f2fd;
-    margin-bottom: 32px;
-    width: 100%;
-    table-layout: fixed;
-}
-th, td {
-    font-size: 15px;
-    padding: 10px 14px;
-    color: #232a34;
-    background: transparent;
-    border-bottom: 1px solid #d0e6ff;
-    box-sizing: border-box;
-    vertical-align: middle;
-}
-th {
-    font-weight: 700;
-    color: #1976d2;
-    border-bottom: 2px solid #b6d6ff;
-}
-/* 表格美化 */
-table {
-    border-radius: 18px;
-    box-shadow: 0 2px 16px rgba(79,140,255,0.10);
-    border-collapse: collapse;
-    background: #e3f2fd;
-    margin-bottom: 32px;
-    width: 100%;
-    table-layout: auto;
-}
-thead {
-    background: linear-gradient(90deg, #e3f2fd 0%, #f8fcff 100%);
-}
-th {
-    font-weight: 700;
-    color: #1976d2;
-    font-size: 16px;
-    padding: 12px 18px;
-    border-bottom: 2px solid #b6d6ff;
-    background: transparent;
-}
-td {
-    font-size: 15px;
-    color: #232a34;
-    padding: 10px 18px;
-    border-bottom: 1px solid #d0e6ff;
-    background: transparent;
-}
-tr {
-    transition: background 0.18s;
-}
-tbody tr:hover {
-    background: #cbe7ff;
-}
-
-/* 行動按鈕區域美化 */
-td .btn, td .fa {
-    font-size: 18px;
-    margin: 0 2px;
-    vertical-align: middle;
-    transition: color 0.18s, background 0.18s;
-}
-td .btn:hover, td .fa:hover {
-    color: #4f8cff;
-    background: #e3f2fd;
-    border-radius: 6px;
-}
-/* 統一主體區塊亮色 */
-.row, .box, .panel, .form-group, .navbar, .page-header {
-    background: #f7f9fe !important;
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(79,140,255,0.06);
-}
-
-/* 搜尋欄美化 */
-.form-group input, .form-group .btn {
-    background: #e3f2fd !important;
-    color: #232a34 !important;
-    border-radius: 8px !important;
-    border: 1px solid #b6d6ff !important;
-}
-.form-group .btn {
-    box-shadow: 0 2px 8px rgba(79,140,255,0.10);
-    font-weight: 500;
-}
-
-/* List 標題美化 */
-.page-header {
-    color: #1976d2 !important;
-    font-weight: 600;
-    font-size: 22px;
-    border-bottom: 1.5px solid #e3f2fd;
-    margin-bottom: 18px;
-}
-/* 覆蓋 Flask-Admin 主體背景色 */
-.content, .admin-content, .container-fluid {
-    background: #f7f9fe !important;
-}
-/* 主體內容區域 */
-.admin-main-content {
-    background: #f7f9fe;
-    min-height: 100vh;
-    padding: 32px 0 32px 0;
-    display: block;
-    width: 100%;
-    box-sizing: border-box;
-}
-
-/* 表格卡片感 */
-.admin-main-content .table {
-    background: #e3f2fd;
-    border-radius: 18px;
-    box-shadow: 0 2px 16px rgba(79,140,255,0.10);
-    padding: 12px 0;
-    margin-bottom: 32px;
-}
-
-/* 表格欄位優化 */
-.admin-main-content th, .admin-main-content td {
-    padding: 10px 18px;
-    font-size: 16px;
-    color: #232a34;
-    background: transparent;
-}
-.admin-main-content th {
-    font-weight: 600;
-    color: #1976d2;
-    background: transparent;
-}
-
-/* 行動按鈕區域美化 */
-.admin-main-content .btn, .admin-main-content .fa {
-    font-size: 18px;
-    margin: 0 2px;
-    vertical-align: middle;
-}
-table {
-    border-radius: 18px;
-    box-shadow: 0 2px 16px rgba(79,140,255,0.10);
-    border-collapse: collapse;
-    background: #e3f2fd;
-    margin-bottom: 32px;
-    width: 100%;
-    table-layout: fixed;
-}
-    align-items: center;
-    gap: 16px;
-    background: linear-gradient(90deg, #e3f2fd 0%, #f8fcff 100%);
-    padding: 12px 0 12px 24px;
-    box-shadow: 0 2px 8px rgba(79,140,255,0.08);
-    border-bottom: 1px solid #d0e6ff;
-    margin-bottom: 12px;
-    z-index: 10;
-}
-
-/* 導航按鈕 */
-.nav-btn {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    background: linear-gradient(90deg, #4f8cff 0%, #6ed6ff 100%);
-    color: #fff;
-    border: none;
-    border-radius: 24px;
-    padding: 8px 22px;
-    margin: 0;
-    font-size: 17px;
-    font-weight: 500;
-    box-shadow: 0 2px 8px rgba(79,140,255,0.12);
-    transition: background 0.3s, transform 0.18s, box-shadow 0.18s;
-    text-decoration: none;
-    cursor: pointer;
-    outline: none;
-    border: 1.5px solid #e3f2fd;
-}
-.nav-btn:hover {
-    background: linear-gradient(90deg, #6ed6ff 0%, #4f8cff 100%);
-    transform: scale(1.07);
-    box-shadow: 0 4px 16px rgba(79,140,255,0.18);
-}
-
-/* 圖示和文字分隔 */
-.nav-icon {
-    font-size: 20px;
-    margin-right: 4px;
-    display: flex;
-    align-items: center;
-}
-.nav-text {
-    font-size: 17px;
-    font-weight: 500;
-    letter-spacing: 1px;
-}
-/* 全域 CSS 變數 */
-:root {
-    --ink: #232a34;           /* 文字深色 */
-    --ink-soft: #eaf1fb;      /* 淺字色 */
-    --brand: #4f8cff;         /* 主要色 */
-    --brand-2: #38c6ff;       /* 輔助亮藍 */
-    --panel: #232a34;         /* 深色面板 */
-    --panel-soft: #f7f9fe;    /* 內容區淡底 */
-    --danger: #d32f2f;        /* 滑過警示紅 */
-}
-
-/* 全站背景 → 淺藍色（不跳色） */
-html, body {
-    background: var(--bg-light);
-    font-family: 'Segoe UI','Noto Sans TC','Arial',sans-serif;
-    color: var(--ink);
-}
-
-/* 內容容器（去漸層） */
-.content, .admin-panel .content{
-    padding: 40px;
-    background: var(--panel-soft);
-    border-radius: 16px;
-    box-shadow: 0 8px 32px rgba(79,140,255,0.10);
-}
-
-/* -------------------
-     導覽列（去漸層）
-     ------------------- */
-.navbar, .navbar-default{
-    background: var(--panel);
-    color: #fff;
-    box-shadow: 0 4px 24px rgba(79,140,255,0.25), 0 0 32px #38c6ff44 inset;
-    border: none;
-    border-radius: 0 0 18px 18px;
-    padding: 0 32px;
-    min-height: 56px;
-    position: relative;
-}
-.navbar-brand{
-    font-weight: 800;
-    font-size: 1.4em;
-    letter-spacing: 2px;
-    color: #fff !important;
-    text-shadow: 0 2px 12px #38c6ff88;
-}
-.navbar-nav > li > a{
-    color: var(--ink-soft) !important;
-    font-weight: 600;
-    font-size: 1.08em;
-    letter-spacing: 1px;
-    border-radius: 8px;
-    margin: 0 4px;
-    padding: 8px 18px;
-    transition: background .25s, color .25s, box-shadow .25s, transform .15s;
-    display: flex; align-items: center;
-}
-.navbar-nav > li > a:hover,
-.navbar-nav > li.active > a{
-    background: transparent;
-    color: var(--danger) !important;
-    box-shadow: none;
-    transform: scale(1.04);
-}
-
-/* 左側 icon（Font Awesome 6） */
-.navbar-nav > li > a{ position: relative; padding-left: 32px; }
-.navbar-nav > li:first-child > a::before,
-.navbar-nav > li:nth-child(2) > a::before,
-.navbar-nav > li:nth-child(3) > a::before,
-.navbar-nav > li:nth-child(4) > a::before{
-    font-family: "Font Awesome 6 Free"; font-weight: 900;
-    position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
-    color: var(--brand-2); font-size: 1.1em; filter: drop-shadow(0 2px 4px #38c6ff88);
-}
-/* Home */
-.navbar-nav > li:first-child > a::before { content: "\f015"; }
-/* 白名單 */
-.navbar-nav > li:nth-child(2) > a::before { content: "\f0ca"; }
-/* 黑名單 */
-.navbar-nav > li:nth-child(3) > a::before { content: "\f05e"; }
-/* 抽獎券 */
-.navbar-nav > li:nth-child(4) > a::before { content: "\f145"; }
-
-/* -------------------
-     側邊欄 / 表格面板
-     ------------------- */
-.sidebar, .admin-panel .sidebar{
-    background: var(--panel);
-    border-radius: 16px;
-    box-shadow: 0 2px 16px rgba(79,140,255,0.10);
-    color: var(--ink-soft);
-    border: none;
-}
-
-/* 表格框體（深色容器、去邊線） */
-
-/* 行內白底（您提供的視覺），滑過紅字 */
-.table tbody tr{
-    background-color: #fff;
-    color: var(--ink);
-    transition: color .2s, background-color .2s, box-shadow .2s;
-}
-.table tbody tr:hover{
-    color: var(--danger);
-    cursor: pointer;
-    box-shadow: inset 0 0 0 9999px rgba(211,47,47,0.03);
-}
-.table tbody tr:hover td,
-.table tbody tr:hover th{
-    color: var(--danger) !important;
-}
-
-/* -------------------
-     動作區：左放觀看/編輯、右放刪除
-     ※ 建議在該欄位加上 <td class="actions"> … </td>
-     ------------------- */
-.table td.actions{
-    display: flex; align-items: center;
-    justify-content: space-between; /* 左右兩側貼齊 */
-    gap: 8px;
-}
-
-/* 左側群組（觀看＋編輯）與右側（刪除） */
-.actions .action-left{ display: inline-flex; gap: 8px; }
-.actions .action-right{ margin-left: auto; } /* 把刪除推到最右 */
-
-/* 若沿用原本 class 也 OK（雙保險） */
-.btn-view, .btn-edit{ float: left; margin-right: 8px; }
-.btn-delete{ float: right; margin-left: 8px; }
-
-/* -------------------
-     按鈕（去漸層、同色系）
-     ------------------- */
-.btn, .btn-primary, .btn-success, .btn-danger, .btn-default{
-    border-radius: 10px;
-    font-weight: 600;
-    background: var(--brand);
-    color: #fff !important;
-    box-shadow: 0 2px 8px rgba(79,140,255,0.15);
-    transition: background .25s, box-shadow .25s, transform .15s;
-    border: none; letter-spacing: .5px;
-}
-.btn:hover, .btn-primary:hover, .btn-success:hover, .btn-danger:hover, .btn-default:hover{
-    background: #3f73d6;
-    box-shadow: 0 4px 16px rgba(56,198,255,0.25);
-    transform: translateY(-1px);
-}
-.btn.btn-danger{ background: #f04747; }
-.btn.btn-danger:hover{ background: #d93131; }
-
-/* -------------------
-     表單 / 分頁（去漸層）
-     ------------------- */
-.form-control, .admin-panel .form-control{
-    border-radius: 8px;
-    border: 1px solid var(--brand);
-    background: #fff;
-    color: var(--ink);
-    box-shadow: 0 1px 4px rgba(79,140,255,0.08);
-}
-.form-control:focus, .admin-panel .form-control:focus{
-    border-color: var(--brand-2);
-    box-shadow: 0 0 0 2px rgba(56,198,255,0.15);
-}
-
-.pagination > li > a, .admin-panel .pagination > li > a{
-    border-radius: 6px;
-    color: var(--brand);
-    background: #fff;
-    border: 1px solid rgba(79,140,255,0.25);
-    transition: background .2s, color .2s, border-color .2s;
-}
-.pagination > li > a:hover, .admin-panel .pagination > li > a:focus{
-    background: var(--brand);
-    color: #fff;
-    border-color: var(--brand);
-}
-
-/* -------------------
-     標題
-     ------------------- */
-h1, h2, h3, h4{
-    font-weight: 700;
-    color: var(--brand-2);
-    text-shadow: 0 2px 8px rgba(56,198,255,0.10);
-    letter-spacing: 1px;
-}
-
-/* FontAwesome Icon 支援（如需） */
 @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
-/* 範例：<button class="btn btn-primary"><i class="fa fa-plus"></i> 新增</button> */
-/* 表格文字區背景與滑鼠特效 */
-
-.table tbody tr {
-    background-color: #fff; /* 白色背景 */
-    color: #232a34; /* 黑字 */
-    transition: color 0.2s, background-color 0.2s;
+html, body {
+	background: linear-gradient(120deg, #eaf1fb 0%, #bcdcff 100%);
+	font-family: 'Noto Sans TC', 'Segoe UI', 'Arial', sans-serif;
+	color: #232a34;
+	letter-spacing: 0.5px;
 }
 
-.table tbody tr:hover {
-    color: #d32f2f;
-    cursor: pointer;
+:root {
+	--ink: #232a34;
+	--ink-soft: #eaf1fb;
+	--brand: #4f8cff;
+	--brand-2: #38c6ff;
+	--panel: #232a34;
+	--panel-soft: #f7f9fe;
+	--danger: #d32f2f;
 }
-.table tbody tr:hover td, .table tbody tr:hover th {
-    color: #d32f2f !important;
-}
-/* 觀看、編輯、刪除按鈕排列 */
-.btn-view, .btn-edit {
-    float: left;
-    margin-right: 8px;
-}
-.btn-delete {
-    float: right;
-    margin-left: 8px;
-}
-.navbar-nav > li > a {
-    position: relative;
-    padding-left: 32px;
-}
-
-/* Home icon */
-.navbar-nav > li:first-child > a::before {
-    content: "\f015";
-    font-family: "Font Awesome 6 Free";
-    font-weight: 900;
-    position: absolute;
-    left: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: #38c6ff;
-    font-size: 1.1em;
-    filter: drop-shadow(0 2px 4px #38c6ff88);
-}
-/* 白名單 icon */
-.navbar-nav > li:nth-child(2) > a::before {
-    content: "\f0ca";
-    font-family: "Font Awesome 6 Free";
-    font-weight: 900;
-    position: absolute;
-    left: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: #38c6ff;
-    font-size: 1.1em;
-    filter: drop-shadow(0 2px 4px #38c6ff88);
-}
-/* 黑名單 icon */
-.navbar-nav > li:nth-child(3) > a::before {
-    content: "\f05e";
-    font-family: "Font Awesome 6 Free";
-    font-weight: 900;
-    position: absolute;
-    left: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: #38c6ff;
-    font-size: 1.1em;
-    filter: drop-shadow(0 2px 4px #38c6ff88);
-}
-/* 抽獎券 icon */
-.navbar-nav > li:nth-child(4) > a::before {
-    content: "\f145";
-    font-family: "Font Awesome 6 Free";
-    font-weight: 900;
-    position: absolute;
-    left: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: #38c6ff;
-    font-size: 1.1em;
-    filter: drop-shadow(0 2px 4px #38c6ff88);
-}
-/* Modern admin panel style */
-
-
-body {
-    background: linear-gradient(120deg, #eaf1fb 0%, #bcdcff 100%);
-    font-family: 'Segoe UI', 'Noto Sans TC', 'Arial', sans-serif;
-    color: #232a34;
-}
-
 
 .navbar, .navbar-default {
-    background: linear-gradient(90deg, #232a34 0%, #4f8cff 100%);
-    color: #fff;
-    box-shadow: 0 4px 24px rgba(79,140,255,0.25), 0 0 32px #38c6ff44 inset;
-    border: none;
-    border-radius: 0 0 18px 18px;
-    padding: 0 32px;
-    min-height: 56px;
-    position: relative;
+	background: linear-gradient(90deg, #232a34 0%, #4f8cff 100%);
+	color: #fff;
+	box-shadow: 0 4px 24px rgba(79,140,255,0.25), 0 0 32px #38c6ff44 inset;
+	border: none;
+	border-radius: 0 0 18px 18px;
+	padding: 0 32px;
+	min-height: 56px;
+	position: relative;
 }
 .navbar-brand {
-    font-weight: 800;
-    font-size: 1.4em;
-    letter-spacing: 2px;
-    color: #fff !important;
-    text-shadow: 0 2px 12px #38c6ff88;
+	font-weight: 800;
+	font-size: 1.4em;
+	letter-spacing: 2px;
+	color: #fff !important;
+	text-shadow: 0 2px 12px #38c6ff88;
 }
 .navbar-nav > li > a {
-    color: #eaf1fb !important;
-    font-weight: 600;
-    font-size: 1.08em;
-    letter-spacing: 1px;
-    border-radius: 8px;
-    margin: 0 4px;
-    padding: 8px 18px;
-    transition: background 0.3s, color 0.3s, box-shadow 0.3s;
-    position: relative;
-    display: flex;
-    align-items: center;
+	color: #eaf1fb !important;
+	font-weight: 600;
+	font-size: 1.08em;
+	letter-spacing: 1px;
+	border-radius: 8px;
+	margin: 0 4px;
+	padding: 8px 18px;
+	transition: background 0.3s, color 0.3s, box-shadow 0.3s;
+	position: relative;
+	display: flex;
+	align-items: center;
 }
 .navbar-nav > li > a:hover, .navbar-nav > li.active > a {
-    background: linear-gradient(90deg, #38c6ff 0%, #4f8cff 100%);
-    color: #232a34 !important;
-    box-shadow: 0 2px 12px #38c6ff44;
-    text-shadow: 0 2px 8px #4f8cff88;
-    transform: scale(1.06);
+	background: linear-gradient(90deg, #38c6ff 0%, #4f8cff 100%);
+	color: #232a34 !important;
+	box-shadow: 0 2px 12px #38c6ff44;
+	text-shadow: 0 2px 8px #4f8cff88;
+	transform: scale(1.06);
 }
 .navbar-nav > li > a i {
-    margin-right: 8px;
-    font-size: 1.1em;
-    color: #fff;
-    filter: drop-shadow(0 2px 4px #38c6ff88);
+	margin-right: 8px;
+	font-size: 1.1em;
+	color: #fff;
+	filter: drop-shadow(0 2px 4px #38c6ff88);
+}
+.navbar-nav > li > a { position: relative; padding-left: 32px; }
+.navbar-nav > li:first-child > a::before { content: "\f015"; }
+.navbar-nav > li:nth-child(2) > a::before { content: "\f0ca"; }
+.navbar-nav > li:nth-child(3) > a::before { content: "\f05e"; }
+.navbar-nav > li:nth-child(4) > a::before { content: "\f145"; }
+.navbar-nav > li > a::before {
+	font-family: "Font Awesome 6 Free"; font-weight: 900;
+	position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+	color: #38c6ff; font-size: 1.1em; filter: drop-shadow(0 2px 4px #38c6ff88);
 }
 
 .sidebar, .admin-panel .sidebar {
-    background: #232a34;
-    border-radius: 16px;
-    box-shadow: 0 2px 16px rgba(79,140,255,0.10);
-    color: #eaf1fb;
-    border: none;
-}
-
-
-.btn, .btn-primary, .btn-success, .btn-danger, .btn-default {
-    border-radius: 10px;
-    font-weight: 600;
-    background: linear-gradient(90deg, #4f8cff 0%, #38c6ff 100%);
-    color: #fff !important;
-    box-shadow: 0 2px 8px rgba(79,140,255,0.15);
-    transition: background 0.3s, box-shadow 0.3s, transform 0.2s;
-    position: relative;
-    overflow: hidden;
-    border: none;
-    letter-spacing: 0.5px;
-}
-.btn:hover, .btn-primary:hover, .btn-success:hover, .btn-danger:hover, .btn-default:hover {
-    background: linear-gradient(90deg, #38c6ff 0%, #4f8cff 100%);
-    box-shadow: 0 4px 16px rgba(56,198,255,0.25);
-    transform: translateY(-2px) scale(1.04);
-}
-.btn i {
-    margin-right: 6px;
-    font-size: 1.1em;
-    vertical-align: middle;
-}
-
-h1, h2, h3, h4 {
-    font-weight: 700;
-    color: #38c6ff;
-    text-shadow: 0 2px 8px rgba(56,198,255,0.10);
-    letter-spacing: 1px;
-}
-
-.form-control, .admin-panel .form-control {
-    border-radius: 8px;
-    border: 1px solid #4f8cff;
-    background: #232a34;
-    color: #eaf1fb;
-    box-shadow: 0 1px 4px rgba(79,140,255,0.08);
-}
-.form-control:focus, .admin-panel .form-control:focus {
-    border-color: #38c6ff;
-    box-shadow: 0 0 0 2px rgba(56,198,255,0.15);
-}
-
-.pagination > li > a, .admin-panel .pagination > li > a {
-    border-radius: 6px;
-    color: #4f8cff;
-    background: #232a34;
-    border: none;
-    transition: background 0.2s, color 0.2s;
-}
-.pagination > li > a:hover, .admin-panel .pagination > li > a:hover {
-    background: #4f8cff;
-    color: #fff;
+	background: #232a34;
+	border-radius: 16px;
+	box-shadow: 0 2px 16px rgba(79,140,255,0.10);
+	color: #eaf1fb;
+	border: none;
 }
 
 .content, .admin-panel .content {
-    padding: 40px;
-    background: linear-gradient(120deg, #f7f8fa 0%, #eaf1fb 100%);
-    border-radius: 16px;
-    box-shadow: 0 8px 32px rgba(79,140,255,0.10);
+	padding: 40px;
+	background: linear-gradient(120deg, #f7f8fa 0%, #eaf1fb 100%);
+	border-radius: 16px;
+	box-shadow: 0 8px 32px rgba(79,140,255,0.10);
 }
 
-/* FontAwesome Icon 支援 */
-@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+table {
+	border-radius: 18px;
+	box-shadow: 0 2px 16px rgba(79,140,255,0.10);
+	border-collapse: collapse;
+	background: #e3f2fd;
+	margin-bottom: 32px;
+	width: 100%;
+	table-layout: fixed;
+}
+th, td {
+	font-size: 15px;
+	padding: 10px 14px;
+	color: #232a34;
+	background: transparent;
+	border-bottom: 1px solid #d0e6ff;
+	box-sizing: border-box;
+	vertical-align: middle;
+}
+th {
+	font-weight: 700;
+	color: #1976d2;
+	border-bottom: 2px solid #b6d6ff;
+}
+thead {
+	background: linear-gradient(90deg, #e3f2fd 0%, #f8fcff 100%);
+}
+tbody tr:hover {
+	background: #cbe7ff;
+}
 
-/* 按鈕 icon 範例：<button class="btn btn-primary"><i class="fa fa-plus"></i> 新增</button> */
+.btn, .btn-primary, .btn-success, .btn-danger, .btn-default {
+	border-radius: 10px;
+	font-weight: 600;
+	background: linear-gradient(90deg, #4f8cff 0%, #38c6ff 100%);
+	color: #fff !important;
+	box-shadow: 0 2px 8px rgba(79,140,255,0.15);
+	transition: background 0.3s, box-shadow 0.3s, transform 0.2s;
+	position: relative;
+	overflow: hidden;
+	border: none;
+	letter-spacing: 0.5px;
+}
+.btn:hover, .btn-primary:hover, .btn-success:hover, .btn-danger:hover, .btn-default:hover {
+	background: linear-gradient(90deg, #38c6ff 0%, #4f8cff 100%);
+	box-shadow: 0 4px 16px rgba(56,198,255,0.25);
+	transform: translateY(-2px) scale(1.04);
+}
+.btn i {
+	margin-right: 6px;
+	font-size: 1.1em;
+	vertical-align: middle;
+}
+
+h1, h2, h3, h4 {
+	font-weight: 700;
+	color: #38c6ff;
+	text-shadow: 0 2px 8px rgba(56,198,255,0.10);
+	letter-spacing: 1px;
+}
+
+.form-control, .admin-panel .form-control {
+	border-radius: 8px;
+	border: 1px solid #4f8cff;
+	background: #232a34;
+	color: #eaf1fb;
+	box-shadow: 0 1px 4px rgba(79,140,255,0.08);
+}
+.form-control:focus, .admin-panel .form-control:focus {
+	border-color: #38c6ff;
+	box-shadow: 0 0 0 2px rgba(56,198,255,0.15);
+}
+
+.pagination > li > a, .admin-panel .pagination > li > a {
+	border-radius: 6px;
+	color: #4f8cff;
+	background: #232a34;
+	border: none;
+	transition: background 0.2s, color 0.2s;
+}
+.pagination > li > a:hover, .admin-panel .pagination > li > a:hover {
+	background: #4f8cff;
+	color: #fff;
+}
+
+.admin-main-content .table {
+	background: #e3f2fd;
+	border-radius: 18px;
+	box-shadow: 0 2px 16px rgba(79,140,255,0.10);
+	padding: 12px 0;
+	margin-bottom: 32px;
+}
+
+.admin-main-content .btn, .admin-main-content .fa {
+	font-size: 18px;
+	margin: 0 2px;
+	vertical-align: middle;
+}
+
+.btn-view, .btn-edit {
+	float: left;
+	margin-right: 8px;
+}
+.btn-delete {
+	float: right;
+	margin-left: 8px;
+}
+
+body, html, .navbar, .sidebar, .content, .form-control, .btn, h1, h2, h3, h4 {
+	font-family: 'Noto Sans TC', 'Segoe UI', 'Arial', sans-serif !important;
+}

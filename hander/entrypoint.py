@@ -14,6 +14,12 @@ from hander.follow import handle_follow
 from hander.image import handle_image
 
 import logging
+
+def _norm(text: str) -> str:
+    if not text:
+        return ''
+    # 全形空白轉半形、去頭尾空白、統一大小寫（保留中文）
+    return text.replace('\u3000', ' ').strip()
 logging.basicConfig(level=logging.INFO)
 
 @handler.add(FollowEvent)
@@ -28,7 +34,7 @@ def on_image(event):
 
 @handler.add(MessageEvent, message=TextMessage)
 def entrypoint(event):
-    user_text = event.message.text.strip()
+    user_text = _norm(event.message.text)
     user_id = event.source.user_id
     logging.info(f"[TextMessage] user_id={user_id} text={user_text}")
 
@@ -56,7 +62,7 @@ def entrypoint(event):
         return
 
     # 驗證資訊
-    if user_text == "驗證資訊":
+    if user_text in ["驗證資訊", "驗證 資訊", "驗證資訊 "]:
         tz = pytz.timezone("Asia/Taipei")
         now = datetime.now(tz)
         today_str = now.strftime('%Y-%m-%d')
@@ -104,7 +110,7 @@ def entrypoint(event):
         return
 
     # ======= 每日抽獎功能 =======
-    if user_text in ["每日抽獎"]:
+    if user_text in ["每日抽獎", "每日 抽獎", "每日抽獎 "]:
         profile = None
         display_name = "用戶"
         try:
@@ -130,7 +136,7 @@ def entrypoint(event):
             return
 
     # 折價券管理
-    if user_text in ["折價券管理", "券紀錄", "我的券紀錄"]:
+    if user_text in ["折價券管理", "券紀錄", "我的券紀錄", "我的 券紀錄"]:
         tz = pytz.timezone("Asia/Taipei")
         now = datetime.now(tz)
         today_str = now.strftime('%Y-%m-%d')

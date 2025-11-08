@@ -41,7 +41,9 @@ def update_or_create_whitelist_from_data(data, user_id, reverify=False):
     phone = data.get("phone")
     is_new = False
 
-    record = Whitelist.query.filter_by(line_user_id=user_id).first()
+    record = None
+    if user_id:
+        record = Whitelist.query.filter_by(line_user_id=user_id).first()
     if record:
         _fill_fields(record, data, fields, user_id, reverify)
         record.created_at = _now() if reverify else record.created_at

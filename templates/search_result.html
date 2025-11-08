@@ -1,43 +1,54 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="zh-Hant">
 <head>
-    <meta charset="utf-8">
-    <title>搜尋結果</title>
-    <link rel="stylesheet" href="/static/admin_custom.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+    <meta charset="UTF-8">
+    <title>資料庫查詢結果</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body { background: #232526; color: #e0e0e0; font-family: 'Roboto', 'Noto Sans TC', sans-serif; margin: 0; }
+        .container { max-width: 800px; margin: 2rem auto; background: #393e46; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,0.18); padding: 2rem; }
+        h1 { color: #00adb5; margin-bottom: 1.5rem; }
+        .result-table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+        th, td { padding: 0.8rem; text-align: left; }
+        th { background: #222831; color: #00adb5; }
+        tr { border-bottom: 1px solid #393e46; }
+        tr:last-child { border-bottom: none; }
+        .type-wl { color: #00e676; font-weight: bold; }
+        .type-bl { color: #e53935; font-weight: bold; }
+        .type-cp { color: #ffd600; font-weight: bold; }
+        .back-btn { background: #00adb5; color: #fff; border: none; border-radius: 8px; padding: 0.7rem 1.5rem; font-size: 1rem; cursor: pointer; margin-top: 2rem; }
+        .back-btn:hover { background: #007b8a; }
+    </style>
 </head>
 <body>
-    <a href="https://web-production-9351.up.railway.app/admin/" style="position: absolute; left: 20px; top: 20px; z-index: 999; font-size: 18px; background: #fff3; padding: 6px 16px; border-radius: 8px; text-decoration: none; color: #333;">回主頁</a>
-<div class="container mt-4">
-    <h2>搜尋結果</h2>
-    <form class="form-inline mb-3" action="/search" method="get">
-        <input class="form-control mr-2" type="search" name="q" value="{{ q }}" placeholder="搜尋...">
-        <button class="btn btn-primary" type="submit">搜尋</button>
-    </form>
-    {% if results %}
-    <table class="table table-bordered">
-        <thead>
-            <tr>
-                <th>類型</th>
-                <th>手機/帳號/編號</th>
-                <th>姓名/暱稱</th>
-                <th>LINE ID/抽獎券編號/金額</th>
-            </tr>
-        </thead>
-        <tbody>
-        {% for r in results %}
-            <tr>
-                <td>{{ r.type }}</td>
-                <td>{{ r.phone or r.line_user_id or r.report_no or '-' }}</td>
-                <td>{{ r.name or '-' }}</td>
-                <td>{{ r.line_id or r.report_no or r.amount or '-' }}</td>
-            </tr>
-        {% endfor %}
-        </tbody>
-    </table>
-    {% else %}
-    <p>查無資料</p>
-    {% endif %}
-</div>
+    <div class="container">
+        <h1>資料庫查詢結果</h1>
+        <p>查詢關鍵字：<strong>{{ q }}</strong></p>
+        {% if results %}
+        <table class="result-table">
+            <thead>
+                <tr>
+                    <th>類型</th>
+                    <th>手機/用戶ID</th>
+                    <th>暱稱/抽獎券編號</th>
+                    <th>LINE ID/金額</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in results %}
+                <tr>
+                    <td class="type-{{ 'wl' if r.type=='白名單' else 'bl' if r.type=='黑名單' else 'cp' }}">{{ r.type }}</td>
+                    <td>{{ r.phone if r.type!='抽獎券' else r.line_user_id }}</td>
+                    <td>{{ r.name if r.type!='抽獎券' else r.report_no }}</td>
+                    <td>{{ r.line_id if r.type=='白名單' else r.amount if r.type=='抽獎券' else '' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p>查無資料。</p>
+        {% endif %}
+        <button class="back-btn" onclick="window.history.back()">返回</button>
+    </div>
 </body>
 </html>

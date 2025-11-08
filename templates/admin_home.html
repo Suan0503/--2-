@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>後台主頁</title>
+  <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    body {font-family:'Zen Maru Gothic','微軟正黑體',sans-serif;background:#f9f7f5;margin:0;color:#444;}
+  .header {text-align:center;padding:24px 0;background:#ffe4ee;box-shadow:0 2px 8px rgba(0,0,0,0.06);} 
+    .header h1 {margin:0;font-size:2.2rem;color:#e57399;letter-spacing:.05em;}
+  .header-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:10px}
+  .header-btn{display:inline-block;background:#ba68c8;color:#fff;padding:8px 14px;border-radius:10px;text-decoration:none;font-weight:700}
+    .grid {max-width:1000px;margin:40px auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:28px;padding:0 20px;}
+  .card {background:#fff;border-radius:18px;padding:26px 24px;box-shadow:0 4px 14px rgba(0,0,0,0.08);display:flex;flex-direction:column;transition:.2s;}
+  .card.stack-top{justify-content:flex-start;}
+    .card:hover {box-shadow:0 8px 24px rgba(0,0,0,0.12);} 
+    .card h2 {margin:0 0 14px;font-size:1.3rem;color:#ba68c8;}
+  .desc {font-size:.9rem;line-height:1.45;color:#666;margin-bottom:8px;}
+    .actions form {display:flex;flex-direction:column;gap:10px;margin-bottom:10px;}
+    .actions input[type=text] {padding:8px 12px;border:1px solid #e0c7d4;border-radius:10px;font-size:.95rem;width:100%;}
+    .actions button {background:linear-gradient(90deg,#f8bbd0,#b2ebf2);border:none;color:#fff;padding:10px 0;border-radius:12px;font-weight:700;cursor:pointer;font-size:.95rem;letter-spacing:.05em;}
+    .actions button:hover {background:linear-gradient(90deg,#f48fb1,#80deea);} 
+  table {width:100%;border-collapse:collapse;font-size:.85rem;margin-top:6px;}
+    thead tr {background:#fce4ec;color:#ba68c8;} 
+  th,td {padding:6px 8px;text-align:left;border-bottom:1px solid #f3e1e7;} 
+  /* 緊湊表格尺寸（針對白/黑名單） */
+  .table-compact{font-size:.80rem}
+  .table-compact th,.table-compact td{padding:4px 6px}
+    .remove-btn {background:#e57373 !important;}
+    .status-pending {color:#ffb74d;font-weight:700;}
+    .status-verified {color:#81c784;font-weight:700;}
+    .status-failed {color:#e57373;font-weight:700;}
+    .footer {text-align:center;font-size:.8rem;color:#888;margin:60px 0 20px;}
+    .note {font-size:.75rem;color:#999;margin-top:4px;}
+  /* flash messages */
+  .flash-wrapper{max-width:1000px;margin:20px auto 0 auto;padding:0 20px;}
+  .flash{background:#fff;padding:12px 16px;margin-bottom:10px;border-radius:12px;box-shadow:0 2px 6px rgba(0,0,0,0.06);font-size:.85rem;border-left:6px solid #64b5f6;}
+  .flash-success{border-left-color:#81c784;}
+  .flash-danger{border-left-color:#e57373;}
+  .flash-warning{border-left-color:#ffb74d;}
+  .flash-info{border-left-color:#64b5f6;}
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>後台主頁</h1>
+    <div style="margin-top:6px;color:#888;font-size:.95rem;">快速管理白名單 / 黑名單 / 待驗證名單</div>
+    <div class="header-actions">
+  <a href="https://web-production-9351.up.railway.app/admin/home" class="header-btn">回首頁</a>
+      <a href="#whitelist" class="header-btn">白名單</a>
+      <a href="#blacklist" class="header-btn">黑名單</a>
+      <a href="#pending" class="header-btn">待驗證名單</a>
+    </div>
+  </div>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="flash-wrapper">
+      {% for category,msg in messages %}
+      <div class="flash flash-{{ category }}">{{ msg }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  {% endwith %}
+  <div id="sections" style="max-width:1200px;margin:30px auto 60px;min-height:480px;padding:0 24px;">
+    <div id="placeholder" style="text-align:center;color:#999;padding:140px 20px;font-size:1rem;letter-spacing:.05em;">請點選上方功能鍵開始管理。</div>
+
+    <!-- 白名單 Section -->
+    <section id="sec-whitelist" class="tab-section" style="display:none;">
+      <h2 style="color:#ba68c8;margin-top:0;">白名單管理</h2>
+      <form method="get" action="/admin/whitelist/search" style="display:flex;gap:10px;margin:6px 0 14px;">
+        <input type="text" name="q" placeholder="搜尋手機 / LINE ID / 暱稱" style="flex:1;padding:10px 14px;border-radius:14px;border:1px solid #e0c7d4;font-size:1rem;">
+        <input type="hidden" name="view" value="home">
+        <button type="submit" style="padding:10px 20px;border-radius:14px;background:#ba68c8;color:#fff;border:none;font-weight:700;font-size:1rem;">搜尋</button>
+      </form>
+      <div style="display:flex;flex-wrap:wrap;gap:30px;align-items:flex-start;">
+        <div style="flex:1;min-width:280px;">
+          <form method="post" action="/admin/whitelist/add" style="display:flex;flex-direction:column;gap:10px;background:#fff;padding:18px 20px;border-radius:18px;box-shadow:0 4px 14px rgba(0,0,0,0.08);">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="text" name="phone" placeholder="手機 (09xxxxxxxx)" maxlength="10" required style="padding:10px 14px;border:1px solid #e0c7d4;border-radius:12px;font-size:.95rem;">
+            <input type="text" name="name" placeholder="暱稱" maxlength="30" required style="padding:10px 14px;border:1px solid #e0c7d4;border-radius:12px;font-size:.95rem;">
+            <input type="text" name="line_id" placeholder="LINE ID" maxlength="50" required style="padding:10px 14px;border:1px solid #e0c7d4;border-radius:12px;font-size:.95rem;">
+            <button type="submit" style="background:#81c784;color:#fff;padding:12px 0;border:none;border-radius:14px;font-weight:700;letter-spacing:.05em;font-size:1rem;">新增白名單</button>
+          </form>
+          <form method="post" action="/admin/whitelist/delete" style="display:flex;flex-direction:column;gap:10px;background:#fff;padding:18px 20px;border-radius:18px;box-shadow:0 4px 14px rgba(0,0,0,0.08);margin-top:18px;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="text" name="phone" placeholder="欲刪除的手機" maxlength="10" required style="padding:10px 14px;border:1px solid #e0c7d4;border-radius:12px;font-size:.95rem;">
+            <button type="submit" class="remove-btn" style="background:#e57373;color:#fff;padding:12px 0;border:none;border-radius:14px;font-weight:700;letter-spacing:.05em;font-size:1rem;">移除白名單</button>
+          </form>
+        </div>
+        <div style="flex:2;min-width:420px;">
+          <div style="font-size:.85rem;color:#666;margin:0 0 6px 4px;">最近 {{ limit }} 筆</div>
+          <div style="background:#fff;padding:10px 16px;border-radius:18px;box-shadow:0 4px 14px rgba(0,0,0,0.08);overflow:auto;max-height:520px;">
+            <table style="width:100%;border-collapse:collapse;font-size:.95rem;">
+              <thead>
+                <tr style="background:#f8e1ef;">
+                  <th style="padding:10px 8px;">手機</th>
+                  <th style="padding:10px 8px;">暱稱</th>
+                  <th style="padding:10px 8px;">LINE ID</th>
+                  <th style="padding:10px 8px;">加入</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for w in whitelists %}
+                <tr style="border-bottom:1px solid #f1dde6;">
+                  <td style="padding:8px 8px;white-space:nowrap;">{{ w.phone }}</td>
+                  <td style="padding:8px 8px;">{{ w.name }}</td>
+                  <td style="padding:8px 8px;">{{ w.line_id }}</td>
+                  <td style="padding:8px 8px;white-space:nowrap;">{{ w.created_at.strftime('%Y/%m/%d') }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 黑名單 Section -->
+    <section id="sec-blacklist" class="tab-section" style="display:none;">
+      <h2 style="color:#ba68c8;margin-top:0;">黑名單管理</h2>
+      <form method="get" action="/admin/blacklist/search" style="display:flex;gap:10px;margin:6px 0 14px;">
+        <input type="text" name="q" placeholder="搜尋手機 / 暱稱" style="flex:1;padding:10px 14px;border-radius:14px;border:1px solid #e0c7d4;font-size:1rem;">
+        <input type="hidden" name="view" value="home">
+        <button type="submit" style="padding:10px 20px;border-radius:14px;background:#ba68c8;color:#fff;border:none;font-weight:700;font-size:1rem;">搜尋</button>
+      </form>
+      <div style="display:flex;flex-wrap:wrap;gap:30px;align-items:flex-start;">
+        <div style="flex:1;min-width:280px;">
+          <form method="post" action="/admin/blacklist/add" style="display:flex;flex-direction:column;gap:10px;background:#fff;padding:18px 20px;border-radius:18px;box-shadow:0 4px 14px rgba(0,0,0,0.08);">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="text" name="phone" placeholder="手機" maxlength="10" required style="padding:10px 14px;border:1px solid #e0c7d4;border-radius:12px;font-size:.95rem;">
+            <input type="text" name="name" placeholder="暱稱" maxlength="30" required style="padding:10px 14px;border:1px solid #e0c7d4;border-radius:12px;font-size:.95rem;">
+            <input type="text" name="reason" placeholder="原因" maxlength="50" required style="padding:10px 14px;border:1px solid #e0c7d4;border-radius:12px;font-size:.95rem;">
+            <button type="submit" style="background:#e57373;color:#fff;padding:12px 0;border:none;border-radius:14px;font-weight:700;letter-spacing:.05em;font-size:1rem;">新增黑名單</button>
+          </form>
+          <form method="post" action="/admin/blacklist/delete" style="display:flex;flex-direction:column;gap:10px;background:#fff;padding:18px 20px;border-radius:18px;box-shadow:0 4px 14px rgba(0,0,0,0.08);margin-top:18px;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="text" name="phone" placeholder="欲刪除的手機" maxlength="10" required style="padding:10px 14px;border:1px solid #e0c7d4;border-radius:12px;font-size:.95rem;">
+            <button type="submit" class="remove-btn" style="background:#e57373;color:#fff;padding:12px 0;border:none;border-radius:14px;font-weight:700;letter-spacing:.05em;font-size:1rem;">移除黑名單</button>
+          </form>
+        </div>
+        <div style="flex:2;min-width:420px;">
+          <div style="font-size:.85rem;color:#666;margin:0 0 6px 4px;">最近 {{ limit }} 筆</div>
+          <div style="background:#fff;padding:10px 16px;border-radius:18px;box-shadow:0 4px 14px rgba(0,0,0,0.08);overflow:auto;max-height:520px;">
+            <table style="width:100%;border-collapse:collapse;font-size:.95rem;">
+              <thead>
+                <tr style="background:#f8e1ef;">
+                  <th style="padding:10px 8px;">手機</th>
+                  <th style="padding:10px 8px;">暱稱</th>
+                  <th style="padding:10px 8px;">原因</th>
+                  <th style="padding:10px 8px;">加入</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for b in blacklists %}
+                <tr style="border-bottom:1px solid #f1dde6;">
+                  <td style="padding:8px 8px;white-space:nowrap;">{{ b.phone }}</td>
+                  <td style="padding:8px 8px;">{{ b.name }}</td>
+                  <td style="padding:8px 8px;">{{ b.reason }}</td>
+                  <td style="padding:8px 8px;white-space:nowrap;">{{ b.created_at.strftime('%Y/%m/%d') }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 待驗證 Section -->
+    <section id="sec-pending" class="tab-section" style="display:none;">
+      <h2 style="color:#ba68c8;margin-top:0;">待驗證名單</h2>
+      <div style="background:#fff;padding:10px 16px;border-radius:18px;box-shadow:0 4px 14px rgba(0,0,0,0.08);overflow:auto;max-height:560px;">
+        <table style="width:100%;border-collapse:collapse;font-size:.95rem;">
+          <thead>
+            <tr style="background:#f8e1ef;">
+              <th style="padding:10px 8px;">手機</th>
+              <th style="padding:10px 8px;">LINE ID</th>
+              <th style="padding:10px 8px;">暱稱</th>
+              <th style="padding:10px 8px;">狀態</th>
+              <th style="padding:10px 8px;">建立</th>
+              <th style="padding:10px 8px;">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for t in tempverifies %}
+            <tr style="border-bottom:1px solid #f1dde6;">
+              <td style="padding:8px 8px;white-space:nowrap;">{{ t.phone }}</td>
+              <td style="padding:8px 8px;">{{ t.line_id }}</td>
+              <td style="padding:8px 8px;">{{ t.nickname }}</td>
+              <td style="padding:8px 8px;" class="status-{{ t.status }}">{{ t.status }}</td>
+              <td style="padding:8px 8px;white-space:nowrap;">{{ t.created_at.strftime('%Y/%m/%d') }}</td>
+              <td style="padding:6px 8px;white-space:nowrap;">
+                <form method="post" action="/admin/tempverify/verify" style="display:inline-block;margin-right:6px;">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <input type="hidden" name="id" value="{{ t.id }}">
+                  <button type="submit" style="padding:6px 12px;font-size:.75rem;border:none;border-radius:10px;background:#81c784;color:#fff;">通過</button>
+                </form>
+                <form method="post" action="/admin/tempverify/delete" style="display:inline-block;">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <input type="hidden" name="id" value="{{ t.id }}">
+                  <button type="submit" class="remove-btn" style="padding:6px 12px;font-size:.75rem;border:none;border-radius:10px;">刪除</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+  <div class="footer">&copy; 2025 後台管理 | 主頁快速操作</div>
+  <script>
+    const map = {
+      'whitelist':'sec-whitelist',
+      'blacklist':'sec-blacklist',
+      'pending':'sec-pending'
+    };
+    function showSection(key){
+      Object.values(map).forEach(id=>{document.getElementById(id).style.display='none'});
+      const el = document.getElementById(map[key]);
+      if(el){
+        document.getElementById('placeholder').style.display='none';
+        el.style.display='block';
+        location.hash = key;
+      }
+    }
+    document.querySelectorAll('.header-actions a[href^="#"]').forEach(a=>{
+      a.addEventListener('click',e=>{
+        const hash = a.getAttribute('href').replace('#','');
+        showSection(hash);
+      });
+    });
+    window.addEventListener('load',()=>{
+      const serverTab = '{{ active_tab or "" }}'.trim();
+      if(serverTab && map[serverTab]){
+        showSection(serverTab);
+        return;
+      }
+      const h = location.hash.replace('#','');
+      if(map[h]) showSection(h);
+    });
+  </script>
+</body>
+</html>

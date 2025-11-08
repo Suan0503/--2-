@@ -1,0 +1,17 @@
+@import url('https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;700&display=swap');
+:root{
+  --bg:#f9f7f5; --primary:#ba68c8; --accent:#e57399; --muted:#e0c7d4; --ink:#444;
+}
+*{box-sizing:border-box}
+body{font-family:'Zen Maru Gothic','微軟正黑體',sans-serif;background:var(--bg);color:var(--ink)}
+.navbar{background:#ffe4ee !important;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.navbar-brand{color:#e57399 !important;font-weight:700;letter-spacing:.03em}
+.btn-primary{background:linear-gradient(90deg,#f8bbd0,#b2ebf2);border:none}
+.btn-primary:hover{background:linear-gradient(90deg,#f48fb1,#80deea)}
+.card{border:none;border-radius:18px;box-shadow:0 4px 14px rgba(0,0,0,.08)}
+.table thead th{background:#fce4ec;color:#ba68c8;border:none}
+.table tbody td{border-top:1px solid #f3e1e7}
+.fa{color:#ba68c8}
+/* header quick area */
+.admin-toolbar{display:flex;gap:10px;align-items:center;margin-left:auto}
+.admin-toolbar a{display:inline-block;background:#ba68c8;color:#fff !important;padding:8px 12px;border-radius:10px;font-weight:700;text-decoration:none}
