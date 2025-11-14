@@ -47,7 +47,8 @@
     <h1>後台主頁</h1>
     <div style="margin-top:6px;color:#888;font-size:.95rem;">快速管理白名單 / 黑名單 / 待驗證名單</div>
     <div class="header-actions">
-  <a href="https://web-production-9351.up.railway.app/admin/home" class="header-btn">回首頁</a>
+  <a href="{{ url_for('admin.home') }}" class="header-btn">回首頁</a>
+  <a href="{{ url_for('admin.wallet_home') }}" class="header-btn">儲值金專區</a>
       <a href="#whitelist" class="header-btn">白名單</a>
       <a href="#blacklist" class="header-btn">黑名單</a>
       <a href="#pending" class="header-btn">待驗證名單</a>

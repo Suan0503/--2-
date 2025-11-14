@@ -39,6 +39,48 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db.init_app(app)
 migrate = Migrate(app, db, directory=os.path.join(os.path.dirname(__file__), 'migrations'))
 
+# APScheduler：每日清除過期優惠券（若有殘留未查詢）
+try:
+    from apscheduler.schedulers.background import BackgroundScheduler
+    scheduler = BackgroundScheduler(timezone='Asia/Taipei')
+
+    def expire_coupons_job():
+        from models import StoredValueWallet, StoredValueTransaction
+        import pytz
+        from datetime import datetime as _dt
+        tz = pytz.timezone('Asia/Taipei')
+        now_dt = _dt.now(tz)
+        expire_dt = tz.localize(_dt(now_dt.year, 12, 31, 23, 59, 59))
+        if now_dt.date() != expire_dt.date():
+            return  # 僅在 12/31 當天執行一次批次清除
+        wallets = StoredValueWallet.query.all()
+        for w in wallets:
+            txns = StoredValueTransaction.query.filter_by(wallet_id=w.id).all()
+            c500 = c300 = 0
+            for t in txns:
+                sign = 1 if t.type == 'topup' else -1
+                c500 += sign * (t.coupon_500_count or 0)
+                c300 += sign * (t.coupon_300_count or 0)
+            c500 = max(c500,0)
+            c300 = max(c300,0)
+            if c500 > 0 or c300 > 0:
+                try:
+                    txn = StoredValueTransaction()
+                    txn.wallet_id = w.id
+                    txn.type = 'consume'
+                    txn.amount = 0
+                    txn.remark = f"AUTO_EXPIRE {expire_dt.strftime('%Y/%m/%d')}"
+                    txn.coupon_500_count = c500
+                    txn.coupon_300_count = c300
+                    db.session.add(txn)
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
+    scheduler.add_job(expire_coupons_job, 'cron', hour=0, minute=10, id='expire_coupons_daily')
+    scheduler.start()
+except Exception:
+    pass  # 若未安裝 apscheduler 則略過排程功能
+
 """Blueprint 註冊"""
 app.register_blueprint(message_bp)
 csrf.exempt(message_bp)  # 豁免 LINE Webhook /callback 不使用 CSRF Token
@@ -94,6 +136,53 @@ def line_status():
         'hint': '請在 LINE Developers 將 Webhook 指向 /callback 並開啟。'
     }
 
+@app.route('/api/wallet')
+def api_wallet():
+    from models import StoredValueWallet, StoredValueTransaction
+    phone = request.args.get('phone','').strip()
+    if not phone:
+        return {'error': 'missing phone'}, 400
+    wl = Whitelist.query.filter_by(phone=phone).first()
+    if not wl or not wl.line_user_id:
+        return {'error': 'not verified'}, 403
+    wallet = StoredValueWallet.query.filter_by(phone=phone).first()
+    if not wallet:
+        return {'phone': phone, 'balance': 0, 'coupon_500': 0, 'coupon_300': 0, 'transactions': []}
+    txns_all = StoredValueTransaction.query.filter_by(wallet_id=wallet.id).order_by(StoredValueTransaction.created_at.asc()).all()
+    c500 = c300 = 0
+    for t in txns_all:
+        sign = 1 if t.type == 'topup' else -1
+        c500 += sign * (t.coupon_500_count or 0)
+        c300 += sign * (t.coupon_300_count or 0)
+    # 到期判斷（與前端一致）
+    import pytz
+    from datetime import datetime as _dt
+    tz = pytz.timezone('Asia/Taipei')
+    now_dt = _dt.now(tz)
+    expire_dt = tz.localize(_dt(now_dt.year, 12, 31, 23, 59, 59))
+    if now_dt > expire_dt:
+        c500 = 0
+        c300 = 0
+    # 最近 20 筆交易概要
+    recent = []
+    for t in txns_all[-20:]:
+        recent.append({
+            'time': t.created_at.isoformat() if t.created_at else None,
+            'type': t.type,
+            'amount': t.amount,
+            'c500': t.coupon_500_count,
+            'c300': t.coupon_300_count,
+            'remark': t.remark
+        })
+    return {
+        'phone': phone,
+        'balance': wallet.balance,
+        'coupon_500': max(c500,0),
+        'coupon_300': max(c300,0),
+        'last_notice_at': wallet.last_coupon_notice_at.isoformat() if wallet.last_coupon_notice_at else None,
+        'transactions': recent
+    }
+
 # 提供 csrf_token() 給模板
 @app.context_processor
 def inject_csrf_token():
@@ -113,7 +202,8 @@ with app.app_context():
             used_create_all = True
             try:
                 # stamp to latest known revision to align DB with migrations state
-                _stamp(migrations_path, '0001_add_tempverify_line_user_id')
+                from flask_migrate import stamp as _stamp  # ensure defined in this scope
+                _stamp(migrations_path, '0003_add_wallet_notice')
             except Exception:
                 pass
     else:
@@ -121,7 +211,7 @@ with app.app_context():
         used_create_all = True
         try:
             from flask_migrate import stamp as _stamp
-            _stamp(migrations_path, '0001_add_tempverify_line_user_id')
+            _stamp(migrations_path, '0003_add_wallet_notice')
         except Exception:
             pass
 
@@ -131,6 +221,24 @@ with app.app_context():
         db.session.commit()
     except Exception:
         db.session.rollback()
+    # 兼容補丁：確保 stored_value_wallet 有 last_coupon_notice_at 欄位
+    try:
+        # PostgreSQL 支援 IF NOT EXISTS
+        db.session.execute(text("ALTER TABLE stored_value_wallet ADD COLUMN IF NOT EXISTS last_coupon_notice_at TIMESTAMP"))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        # SQLite 無 IF NOT EXISTS：檢查後再新增
+        try:
+            engine_name = db.get_engine().name
+            if engine_name == 'sqlite':
+                info = db.session.execute(text("PRAGMA table_info(stored_value_wallet)")).fetchall()
+                cols = {row[1] for row in info}
+                if 'last_coupon_notice_at' not in cols:
+                    db.session.execute(text("ALTER TABLE stored_value_wallet ADD COLUMN last_coupon_notice_at TIMESTAMP"))
+                    db.session.commit()
+        except Exception:
+            db.session.rollback()
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))

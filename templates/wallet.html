@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>儲值金專區</title>
+  <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    body{font-family:'Zen Maru Gothic','微軟正黑體',sans-serif;background:#f9f7f5;margin:0;color:#444}
+    .header{padding:20px;text-align:center;background:#e8eaf6;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+    .header a{display:inline-block;margin:6px 8px;background:#7e57c2;color:#fff;padding:8px 12px;border-radius:10px;text-decoration:none}
+    .container{max-width:1100px;margin:20px auto;padding:0 16px}
+    .card{background:#fff;border-radius:16px;box-shadow:0 4px 14px rgba(0,0,0,.08);padding:18px;margin-bottom:18px}
+    .row{display:flex;gap:20px;flex-wrap:wrap}
+    .col{flex:1 1 320px}
+    table{width:100%;border-collapse:collapse}
+    th,td{border-bottom:1px solid #eee;padding:8px 10px;text-align:left;font-size:.9rem}
+    thead tr{background:#ede7f6;color:#673ab7}
+    .flash-wrapper{max-width:1100px;margin:10px auto 0;padding:0 16px}
+    .flash{background:#fff;padding:10px 14px;margin-bottom:8px;border-radius:12px;box-shadow:0 2px 6px rgba(0,0,0,.06);font-size:.85rem;border-left:6px solid #64b5f6}
+    .flash-success{border-left-color:#81c784}
+    .flash-danger{border-left-color:#e57373}
+    .flash-warning{border-left-color:#ffb74d}
+    .flash-info{border-left-color:#64b5f6}
+    input,textarea{width:100%;padding:10px 12px;border:1px solid #e0c7d4;border-radius:10px}
+    button{background:#7e57c2;color:#fff;border:none;padding:10px 14px;border-radius:12px;cursor:pointer}
+    .danger{background:#e57373}
+  </style>
+  <script>
+    function confirmConsume(){
+      return confirm('確認扣款？此操作無法撤銷');
+    }
+  </script>
+</head>
+<body>
+  <div class="header">
+    <h2>💳 儲值金專區</h2>
+    <a href="/admin/home">回後台主頁</a>
+  </div>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="flash-wrapper">
+        {% for category,msg in messages %}
+          <div class="flash flash-{{ category }}">{{ msg }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+  <div class="container">
+    <div class="card">
+      <form method="get" action="/admin/wallet" style="display:flex;gap:10px;align-items:center">
+        <input name="q" value="{{ q or '' }}" placeholder="輸入手機或用戶編號查詢" />
+        <button type="submit">查詢</button>
+      </form>
+  {% if error %}
+  <div style="margin-top:10px;color:#d32f2f;font-size:.85rem;">{{ error }}</div>
+  {% endif %}
+  {% if not wallet and q %}
+  <div style="margin-top:10px;color:#666;font-size:.85rem;">未找到資料，可確認是否輸入正確或該手機尚未建立錢包（可直接儲值自動建立）。</div>
+  {% elif not wallet and not q %}
+  <div style="margin-top:10px;color:#666;font-size:.85rem;">請先輸入手機或白名單編號查詢。</div>
+  {% endif %}
+    </div>
+
+    {% if wallet %}
+    <div class="row">
+      <div class="col">
+        <div class="card">
+          <h3>用戶資訊</h3>
+          <div>手機：{{ wallet.phone or '未綁定' }}</div>
+          <div>白名單編號：{{ wallet.whitelist_id or '未綁定' }}</div>
+          <div>目前餘額：<b>{{ wallet.balance }}</b></div>
+          <div>折價券剩餘：500券 x {{ coupon_500_total or 0 }}、300券 x {{ coupon_300_total or 0 }}</div>
+          <div>上次到期提醒：{{ wallet.last_coupon_notice_at.strftime('%Y/%m/%d %H:%M:%S') if wallet.last_coupon_notice_at else '尚未提醒' }}</div>
+        </div>
+        <div class="card">
+          <h3>儲值</h3>
+          <form method="post" action="/admin/wallet/topup">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="phone" value="{{ wallet.phone }}">
+            <label>金額</label>
+            <input name="amount" type="number" min="0" required />
+            <label>備註</label>
+            <textarea name="remark" rows="2" placeholder="備註（例如：現金、轉帳後五碼...）"></textarea>
+            <div style="display:flex;gap:10px;margin-top:8px">
+              <div>
+                <label>500券</label>
+                <input name="coupon_500_count" type="number" min="0" value="0" />
+              </div>
+              <div>
+                <label>300券</label>
+                <input name="coupon_300_count" type="number" min="0" value="0" />
+              </div>
+            </div>
+            <div style="margin-top:10px"><button type="submit">儲值</button></div>
+          </form>
+        </div>
+      </div>
+      <div class="col">
+        <div class="card">
+          <h3>扣款</h3>
+          <form method="post" action="/admin/wallet/consume" onsubmit="return confirmConsume()">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="phone" value="{{ wallet.phone }}">
+            <label>金額</label>
+            <input name="amount" type="number" min="0" required />
+            <label>備註</label>
+            <textarea name="remark" rows="2" placeholder="備註（例如：預約紀錄）"></textarea>
+            <div style="display:flex;gap:10px;margin-top:8px">
+              <div>
+                <label>500券</label>
+                <input name="coupon_500_count" type="number" min="0" value="0" />
+              </div>
+              <div>
+                <label>300券</label>
+                <input name="coupon_300_count" type="number" min="0" value="0" />
+              </div>
+            </div>
+            <div style="margin-top:10px"><button type="submit" class="danger">扣款</button></div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>最近交易</h3>
+      <table>
+        <thead><tr><th>時間</th><th>類型</th><th>金額</th><th>備註</th><th>500券</th><th>300券</th></tr></thead>
+        <tbody>
+          {% for t in txns %}
+          <tr>
+            <td>{{ t.created_at.strftime('%Y/%m/%d %H:%M') if t.created_at else '' }}</td>
+            <td>{{ t.type }}</td>
+            <td>{{ t.amount }}</td>
+            <td>{{ t.remark }}</td>
+            <td>{{ t.coupon_500_count }}</td>
+            <td>{{ t.coupon_300_count }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+</body>
+</html>

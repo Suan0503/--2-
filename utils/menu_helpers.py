@@ -223,6 +223,13 @@ def get_menu_carousel():
                             "style": "primary",
                             "color": COLOR_PRIMARY
                         },
+                        # 2.5. 儲值金專區
+                        {
+                            "type": "button",
+                            "action": {"type": "message", "label": "💳 儲值金專區", "text": "儲值金"},
+                            "style": "primary",
+                            "color": COLOR_ACCENT
+                        },
                         # 3. 呼叫管理員
                         {
                             "type": "button",

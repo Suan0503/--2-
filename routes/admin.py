@@ -1,11 +1,12 @@
 import os
 from flask import Blueprint, render_template, request, redirect, url_for, flash
-from models import Whitelist, Blacklist, TempVerify
+from models import Whitelist, Blacklist, TempVerify, StoredValueWallet, StoredValueTransaction
 from utils.db_utils import update_or_create_whitelist_from_data
 from hander.verify import EXTRA_NOTICE
 from linebot.models import TextSendMessage
 from extensions import line_bot_api
 from extensions import db
+from datetime import datetime
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
@@ -70,7 +71,7 @@ def admin_dashboard():
 # 白名單
 @admin_bp.route('/whitelist/search')
 def whitelist_search():
-    q = request.args.get('q', '').strip()
+    q = request.args.get('q','').strip()
     view = request.args.get('view')
     if q:
         whitelists = Whitelist.query.filter(
@@ -83,33 +84,13 @@ def whitelist_search():
     if view == 'home':
         return render_home(whitelists=whitelists, active_tab='whitelist')
     return render_dashboard(whitelists=whitelists)
-
-
-@admin_bp.route('/whitelist/add', methods=['POST'])
-def whitelist_add():
-    phone = request.form.get('phone','').strip()
-    name = request.form.get('name','').strip()
-    line_id = request.form.get('line_id','').strip()
-    if not phone or not name or not line_id:
-        flash('白名單新增資料不完整','warning')
-        return redirect(url_for('admin.admin_dashboard'))
-    if Whitelist.query.filter_by(phone=phone).first():
-        flash('手機已存在於白名單','danger')
-        return redirect(url_for('admin.admin_dashboard'))
-    w = Whitelist(phone=phone, name=name, line_id=line_id)
-    db.session.add(w)
-    db.session.commit()
-    flash('白名單新增成功','success')
-    return redirect(url_for('admin.home', tab='whitelist'))
-
-
 @admin_bp.route('/whitelist/delete', methods=['POST'])
 def whitelist_delete():
     phone = request.form.get('phone','').strip()
     w = Whitelist.query.filter_by(phone=phone).first()
     if not w:
-        flash('找不到該白名單紀錄','danger')
-        return redirect(url_for('admin.admin_dashboard'))
+        flash('找不到該白名單記錄','danger')
+        return redirect(url_for('admin.home', tab='whitelist'))
     db.session.delete(w)
     db.session.commit()
     flash('白名單刪除成功','info')
@@ -140,11 +121,14 @@ def blacklist_add():
     reason = request.form.get('reason','').strip()
     if not phone or not name or not reason:
         flash('黑名單新增資料不完整','warning')
-        return redirect(url_for('admin.admin_dashboard'))
+        return redirect(url_for('admin.home', tab='blacklist'))
     if Blacklist.query.filter_by(phone=phone).first():
-        flash('手機已存在於黑名單','danger')
-        return redirect(url_for('admin.admin_dashboard'))
-    b = Blacklist(phone=phone, name=name, reason=reason)
+        flash('手機已存在於黑名單','warning')
+        return redirect(url_for('admin.home', tab='blacklist'))
+    b = Blacklist()
+    b.phone = phone
+    b.name = name
+    b.reason = reason
     db.session.add(b)
     db.session.commit()
     flash('黑名單新增成功','success')
@@ -156,8 +140,8 @@ def blacklist_delete():
     phone = request.form.get('phone','').strip()
     b = Blacklist.query.filter_by(phone=phone).first()
     if not b:
-        flash('找不到該黑名單紀錄','danger')
-        return redirect(url_for('admin.admin_dashboard'))
+        flash('找不到該黑名單記錄','danger')
+        return redirect(url_for('admin.home', tab='blacklist'))
     db.session.delete(b)
     db.session.commit()
     flash('黑名單刪除成功','info')
@@ -218,3 +202,132 @@ def tempverify_delete():
 @admin_bp.route('/schedule/')
 def admin_schedule():
     return render_template('schedule.html')
+
+
+# ========= 儲值金專區 =========
+@admin_bp.route('/wallet')
+def wallet_home():
+    q = (request.args.get('q') or '').strip()
+    wallet = None
+    txns = []
+    coupon_500_total = 0
+    coupon_300_total = 0
+    error = None
+    if q:
+        try:
+            # 以手機或用戶編號查找
+            wl = None
+            if q.isdigit():
+                try:
+                    wl = Whitelist.query.filter((Whitelist.phone == q) | (Whitelist.id == int(q))).first()
+                except Exception:
+                    wl = Whitelist.query.filter_by(phone=q).first()
+            else:
+                wl = Whitelist.query.filter_by(phone=q).first()
+            wallet = None
+            if wl:
+                wallet = StoredValueWallet.query.filter_by(whitelist_id=wl.id).first()
+                if not wallet:
+                    wallet = StoredValueWallet()
+                    wallet.whitelist_id = wl.id
+                    wallet.phone = wl.phone
+                    wallet.balance = 0
+                    db.session.add(wallet)
+                    db.session.commit()
+            else:
+                wallet = StoredValueWallet.query.filter_by(phone=q).first()
+                if not wallet and q.isdigit() and len(q) == 10 and q.startswith('09'):
+                    wallet = StoredValueWallet()
+                    wallet.phone = q
+                    wallet.balance = 0
+                    db.session.add(wallet)
+                    db.session.commit()
+            if wallet:
+                # 近期交易
+                txns = (StoredValueTransaction.query
+                        .filter_by(wallet_id=wallet.id)
+                        .order_by(StoredValueTransaction.created_at.desc())
+                        .limit(100).all())
+                # 折價券總數（全量計算避免被limit影響）
+                all_txns = StoredValueTransaction.query.filter_by(wallet_id=wallet.id).all()
+                c500 = c300 = 0
+                for t in all_txns:
+                    sign = 1 if t.type == 'topup' else -1
+                    c500 += sign * (t.coupon_500_count or 0)
+                    c300 += sign * (t.coupon_300_count or 0)
+                coupon_500_total = max(c500, 0)
+                coupon_300_total = max(c300, 0)
+        except Exception as e:
+            db.session.rollback()
+            error = f"資料讀取錯誤，可能尚未執行遷移：{e}"
+    return render_template('wallet.html', q=q, wallet=wallet, txns=txns, error=error,
+                           coupon_500_total=coupon_500_total, coupon_300_total=coupon_300_total)
+
+
+def _get_or_create_wallet_by_phone(phone):
+    phone = (phone or '').strip()
+    wl = Whitelist.query.filter_by(phone=phone).first()
+    wallet = StoredValueWallet.query.filter_by(phone=phone).first()
+    if not wallet:
+        wallet = StoredValueWallet()
+        wallet.phone = phone
+        wallet.balance = 0
+        wallet.whitelist_id = wl.id if wl else None
+        db.session.add(wallet)
+        db.session.commit()
+    return wallet
+
+
+@admin_bp.route('/wallet/topup', methods=['POST'])
+def wallet_topup():
+    phone = (request.form.get('phone') or '').strip()
+    amount = int(request.form.get('amount') or 0)
+    raw_remark = (request.form.get('remark') or '').strip()
+    c500 = int(request.form.get('coupon_500_count') or 0)
+    c300 = int(request.form.get('coupon_300_count') or 0)
+    if amount < 0:
+        flash('金額不可為負數','warning')
+        return redirect(url_for('admin.wallet_home', q=phone))
+    wallet = _get_or_create_wallet_by_phone(phone)
+    wallet.balance += amount
+    wallet.updated_at = datetime.utcnow()
+    txn = StoredValueTransaction()
+    txn.wallet_id = wallet.id
+    txn.type = 'topup'
+    txn.amount = amount
+    txn.remark = raw_remark if raw_remark else 'TOPUP_CASH'
+    txn.coupon_500_count = c500
+    txn.coupon_300_count = c300
+    db.session.add(txn)
+    db.session.commit()
+    flash(f'已為 {phone} 儲值 {amount} 元，餘額 {wallet.balance}','success')
+    return redirect(url_for('admin.wallet_home', q=phone))
+
+
+@admin_bp.route('/wallet/consume', methods=['POST'])
+def wallet_consume():
+    phone = (request.form.get('phone') or '').strip()
+    amount = int(request.form.get('amount') or 0)
+    raw_remark = (request.form.get('remark') or '').strip()
+    c500 = int(request.form.get('coupon_500_count') or 0)
+    c300 = int(request.form.get('coupon_300_count') or 0)
+    wallet = _get_or_create_wallet_by_phone(phone)
+    if amount < 0:
+        flash('金額不可為負數','warning')
+        return redirect(url_for('admin.wallet_home', q=phone))
+    if amount > 0 and wallet.balance < amount:
+        flash('餘額不足','danger')
+        return redirect(url_for('admin.wallet_home', q=phone))
+    wallet.balance -= amount
+    wallet.updated_at = datetime.utcnow()
+    txn = StoredValueTransaction()
+    txn.wallet_id = wallet.id
+    txn.type = 'consume'
+    txn.amount = amount
+    txn.remark = raw_remark if raw_remark else 'CONSUME_SERVICE'
+    txn.coupon_500_count = c500
+    txn.coupon_300_count = c300
+    db.session.add(txn)
+    db.session.commit()
+    flash(f'已為 {phone} 扣款 {amount} 元，餘額 {wallet.balance}','info')
+    return redirect(url_for('admin.wallet_home', q=phone))
