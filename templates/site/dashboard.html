@@ -1,0 +1,114 @@
+{% extends 'site/base.html' %}
+{% block content %}
+<h2>管理後台</h2>
+<p>嗨，{{ user.name or user.email }}。在這裡可以直接新增/修改內容，變更即時生效（熱更新）。</p>
+
+<h3>新增班表</h3>
+<form action="/schedule/new" method="post" style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;align-items:end;">
+  <div><label>名稱</label><input type="text" name="name" required></div>
+  <div><label>國籍</label>
+    <select name="nation">
+      <option value="tw">台灣</option>
+      <option value="vn">越南</option>
+      <option value="th">泰國</option>
+      <option value="id">印尼</option>
+    </select>
+  </div>
+  <div><label>房號</label><input type="text" name="room"></div>
+  <div><label>開始時間</label><input type="text" name="start" placeholder="YYYY-MM-DD HH:MM" required></div>
+  <div><label>時長</label>
+    <select name="duration" required>
+      <option value="40">40</option>
+      <option value="60">60</option>
+      <option value="90">90</option>
+    </select>
+  </div>
+  <div><label>語言</label>
+    <label><input type="checkbox" name="lang" value="zh">中</label>
+    <label><input type="checkbox" name="lang" value="en">英</label>
+  </div>
+  <div><label>價格</label><input type="number" name="price" min="0" step="1"></div>
+  <div><button type="submit" class="btn">新增</button></div>
+</form>
+
+<table style="width:100%;margin-top:12px;">
+  <tr><th>名稱</th><th>時間</th><th>價格</th><th>狀態</th><th>操作</th></tr>
+  {% for s in schedules %}
+  <tr>
+    <td>{{ s.girl_name }}</td>
+    <td>{{ s.start_time.strftime('%Y/%m/%d %H:%M') }} / {{ s.duration_min }} 分</td>
+    <td>{{ s.price or '—' }}</td>
+    <td>{{ '顯示' if s.visible else '隱藏' }}</td>
+    <td>
+      <form method="post" action="/schedule/{{ s.id }}/toggle" style="display:inline"><button>切換顯示</button></form>
+      <form method="post" action="/schedule/{{ s.id }}/delete" style="display:inline"><button>刪除</button></form>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+
+<h3 style="margin-top:24px;">新增貼文</h3>
+<form action="/posts/new" method="post">
+  <div><label>標題</label><input type="text" name="title" required></div>
+  <div><label>內文</label><textarea name="body" rows="5"></textarea></div>
+  <div><label>價格</label><input type="number" name="price" min="0" step="1"></div>
+  <button type="submit" class="btn">建立</button>
+</form>
+
+<h4 style="margin-top:12px;">貼文列表</h4>
+<table style="width:100%;">
+  <tr><th>標題</th><th>價位</th><th>時間</th><th>發布</th><th>操作</th></tr>
+  {% for p in posts %}
+  <tr>
+    <td>{{ p.title }}</td>
+    <td>{{ p.price or '—' }}</td>
+    <td>{{ p.created_at.strftime('%Y/%m/%d %H:%M') }}</td>
+    <td>{{ '是' if p.is_published else '否' }}</td>
+    <td>
+      <a href="/posts/{{ p.id }}/edit">編輯</a>
+      <form method="post" action="/posts/{{ p.id }}/delete" style="display:inline"><button>刪除</button></form>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+
+<h3 style="margin-top:24px;">圖片上傳</h3>
+<form id="upload-form" method="post" action="/upload" enctype="multipart/form-data">
+  <input type="file" name="file" accept="image/*">
+  <button type="submit">上傳</button>
+</form>
+<div id="upload-result"></div>
+<h4 style="margin-top:12px;">圖片列表 (最新 100)</h4>
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;">
+  {% for a in assets %}
+  <div style="border:1px solid #444;padding:6px;border-radius:6px;">
+    <div style="height:120px;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#111;">
+      <img src="{{ a.url }}" alt="asset" style="max-width:100%;max-height:120px;object-fit:cover;" loading="lazy">
+    </div>
+    <div style="font-size:12px;margin-top:4px;word-break:break-all;">{{ a.filename or '—' }}</div>
+    <form method="post" action="/media/{{ a.id }}/delete" onsubmit="return confirm('確定刪除？');" style="margin-top:4px;text-align:center;">
+      <button style="background:#e53935;color:#fff;border:none;padding:4px 8px;border-radius:4px;">刪除</button>
+    </form>
+  </div>
+  {% else %}
+    <p style="grid-column:1/-1;">尚無圖片</p>
+  {% endfor %}
+</div>
+<script>
+const f = document.getElementById('upload-form');
+const resBox = document.getElementById('upload-result');
+if (f) {
+  f.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(f);
+    const r = await fetch(f.action, { method: 'POST', body: fd });
+    const j = await r.json();
+    if (j.url) {
+      resBox.innerHTML = `<p>已上傳：<a href="${j.url}" target="_blank">${j.url}</a></p>`;
+    } else {
+      resBox.innerText = JSON.stringify(j);
+    }
+  });
+}
+</script>
+{% endblock %}

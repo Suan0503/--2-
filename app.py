@@ -56,14 +56,19 @@ try:
         wallets = StoredValueWallet.query.all()
         for w in wallets:
             txns = StoredValueTransaction.query.filter_by(wallet_id=w.id).all()
-            c500 = c300 = 0
+            c500 = c300 = c100 = 0
             for t in txns:
                 sign = 1 if t.type == 'topup' else -1
                 c500 += sign * (t.coupon_500_count or 0)
                 c300 += sign * (t.coupon_300_count or 0)
+                try:
+                    c100 += sign * (getattr(t, 'coupon_100_count', 0) or 0)
+                except Exception:
+                    pass
             c500 = max(c500,0)
             c300 = max(c300,0)
-            if c500 > 0 or c300 > 0:
+            c100 = max(c100,0)
+            if c500 > 0 or c300 > 0 or c100 > 0:
                 try:
                     txn = StoredValueTransaction()
                     txn.wallet_id = w.id
@@ -72,6 +77,10 @@ try:
                     txn.remark = f"AUTO_EXPIRE {expire_dt.strftime('%Y/%m/%d')}"
                     txn.coupon_500_count = c500
                     txn.coupon_300_count = c300
+                    try:
+                        txn.coupon_100_count = c100
+                    except Exception:
+                        pass
                     db.session.add(txn)
                     db.session.commit()
                 except Exception:
@@ -147,13 +156,17 @@ def api_wallet():
         return {'error': 'not verified'}, 403
     wallet = StoredValueWallet.query.filter_by(phone=phone).first()
     if not wallet:
-        return {'phone': phone, 'balance': 0, 'coupon_500': 0, 'coupon_300': 0, 'transactions': []}
+        return {'phone': phone, 'balance': 0, 'coupon_500': 0, 'coupon_300': 0, 'coupon_100': 0, 'transactions': []}
     txns_all = StoredValueTransaction.query.filter_by(wallet_id=wallet.id).order_by(StoredValueTransaction.created_at.asc()).all()
-    c500 = c300 = 0
+    c500 = c300 = c100 = 0
     for t in txns_all:
         sign = 1 if t.type == 'topup' else -1
         c500 += sign * (t.coupon_500_count or 0)
         c300 += sign * (t.coupon_300_count or 0)
+        try:
+            c100 += sign * (getattr(t, 'coupon_100_count', 0) or 0)
+        except Exception:
+            pass
     # 到期判斷（與前端一致）
     import pytz
     from datetime import datetime as _dt
@@ -163,6 +176,7 @@ def api_wallet():
     if now_dt > expire_dt:
         c500 = 0
         c300 = 0
+        c100 = 0
     # 最近 20 筆交易概要
     recent = []
     for t in txns_all[-20:]:
@@ -172,6 +186,7 @@ def api_wallet():
             'amount': t.amount,
             'c500': t.coupon_500_count,
             'c300': t.coupon_300_count,
+            'c100': getattr(t, 'coupon_100_count', 0),
             'remark': t.remark
         })
     return {
@@ -179,6 +194,7 @@ def api_wallet():
         'balance': wallet.balance,
         'coupon_500': max(c500,0),
         'coupon_300': max(c300,0),
+        'coupon_100': max(c100,0),
         'last_notice_at': wallet.last_coupon_notice_at.isoformat() if wallet.last_coupon_notice_at else None,
         'transactions': recent
     }
@@ -236,6 +252,23 @@ with app.app_context():
                 cols = {row[1] for row in info}
                 if 'last_coupon_notice_at' not in cols:
                     db.session.execute(text("ALTER TABLE stored_value_wallet ADD COLUMN last_coupon_notice_at TIMESTAMP"))
+                    db.session.commit()
+        except Exception:
+            db.session.rollback()
+
+    # 兼容補丁：確保 stored_value_txn 有 coupon_100_count 欄位
+    try:
+        db.session.execute(text("ALTER TABLE stored_value_txn ADD COLUMN IF NOT EXISTS coupon_100_count INTEGER DEFAULT 0 NOT NULL"))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        try:
+            engine_name = db.get_engine().name
+            if engine_name == 'sqlite':
+                info = db.session.execute(text("PRAGMA table_info(stored_value_txn)")).fetchall()
+                cols = {row[1] for row in info}
+                if 'coupon_100_count' not in cols:
+                    db.session.execute(text("ALTER TABLE stored_value_txn ADD COLUMN coupon_100_count INTEGER DEFAULT 0 NOT NULL"))
                     db.session.commit()
         except Exception:
             db.session.rollback()

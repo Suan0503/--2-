@@ -1,0 +1,15 @@
+{% extends 'site/base.html' %}
+{% block content %}
+<h2>{{ '編輯貼文' if post else '新增貼文' }}</h2>
+<form method="post">
+  <div><label>標題</label><input type="text" name="title" value="{{ post.title if post else '' }}" required></div>
+  <div><label>內文</label><textarea name="body" rows="8">{{ post.body if post else '' }}</textarea></div>
+  <div><label>價格</label><input type="number" name="price" min="0" step="1" value="{{ post.price if post else '' }}"></div>
+  {% if post %}
+  <div>
+    <label><input type="checkbox" name="is_published" {% if post.is_published %}checked{% endif %}> 發布</label>
+  </div>
+  {% endif %}
+  <button type="submit" class="btn">儲存</button>
+</form>
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends 'site/base.html' %}
+{% block content %}
+<h2>登入</h2>
+<form method="post">
+  <div>
+    <label>Email</label>
+    <input type="email" name="email" required>
+  </div>
+  <div>
+    <label>密碼</label>
+    <input type="password" name="password" required>
+  </div>
+  <button type="submit" class="btn magic-effect">登入</button>
+</form>
+<p>沒有帳號？<a href="/register">去註冊</a></p>
+{% endblock %}

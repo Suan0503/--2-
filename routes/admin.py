@@ -212,6 +212,8 @@ def wallet_home():
     txns = []
     coupon_500_total = 0
     coupon_300_total = 0
+    coupon_100_total = 0
+    wl_user = None
     error = None
     if q:
         try:
@@ -248,20 +250,524 @@ def wallet_home():
                         .filter_by(wallet_id=wallet.id)
                         .order_by(StoredValueTransaction.created_at.desc())
                         .limit(100).all())
+                # 轉換時間為台北時區字串
+                try:
+                    import pytz
+                    tz = pytz.timezone('Asia/Taipei')
+                    utc = pytz.utc
+                    for _t in txns:
+                        dt = getattr(_t, 'created_at', None)
+                        if dt:
+                            if dt.tzinfo is None:
+                                dt = utc.localize(dt)
+                            local_dt = dt.astimezone(tz)
+                            _t.local_time_str = local_dt.strftime('%Y/%m/%d %H:%M')
+                        else:
+                            _t.local_time_str = ''
+                except Exception:
+                    for _t in txns:
+                        _t.local_time_str = _t.created_at.strftime('%Y/%m/%d %H:%M') if _t.created_at else ''
+                # 調整備註：topup 金額=0 且有任一折價券 → 使用折價券
+                for _t in txns:
+                    try:
+                        if (_t.type == 'topup' and (_t.amount or 0) == 0 and ((getattr(_t,'coupon_500_count',0) or 0) or (getattr(_t,'coupon_300_count',0) or 0) or (getattr(_t,'coupon_100_count',0) or 0))):
+                            _t.adjusted_remark = '使用折價券'
+                        else:
+                            _t.adjusted_remark = _t.remark
+                    except Exception:
+                        _t.adjusted_remark = _t.remark
                 # 折價券總數（全量計算避免被limit影響）
                 all_txns = StoredValueTransaction.query.filter_by(wallet_id=wallet.id).all()
-                c500 = c300 = 0
+                c500 = c300 = c100 = 0
                 for t in all_txns:
                     sign = 1 if t.type == 'topup' else -1
                     c500 += sign * (t.coupon_500_count or 0)
                     c300 += sign * (t.coupon_300_count or 0)
+                    # 可能舊資料無欄位
+                    try:
+                        c100 += sign * (getattr(t, 'coupon_100_count', 0) or 0)
+                    except Exception:
+                        pass
                 coupon_500_total = max(c500, 0)
                 coupon_300_total = max(c300, 0)
+                coupon_100_total = max(c100, 0)
+                # 用戶資訊（暱稱、LINE ID）
+                try:
+                    if wallet.whitelist_id:
+                        wl_user = Whitelist.query.filter_by(id=wallet.whitelist_id).first()
+                    elif wallet.phone:
+                        wl_user = Whitelist.query.filter_by(phone=wallet.phone).first()
+                except Exception:
+                    wl_user = None
         except Exception as e:
             db.session.rollback()
             error = f"資料讀取錯誤，可能尚未執行遷移：{e}"
     return render_template('wallet.html', q=q, wallet=wallet, txns=txns, error=error,
-                           coupon_500_total=coupon_500_total, coupon_300_total=coupon_300_total)
+                           coupon_500_total=coupon_500_total, coupon_300_total=coupon_300_total,
+                           coupon_100_total=coupon_100_total, wl_user=wl_user)
+
+@admin_bp.route('/wallet/summary')
+def wallet_summary():
+    """列出所有已有錢包的用戶：手機號碼 / 暱稱 / 編號 / 累計儲值金額 / 目前餘額 / 折價券(500/300/100)。支援手機搜尋。"""
+    q = (request.args.get('q') or '').strip()
+    base_query = StoredValueWallet.query
+    if q:
+        base_query = base_query.filter(StoredValueWallet.phone.like(f"%{q}%"))
+    wallets = base_query.order_by(StoredValueWallet.created_at.asc()).all()
+    rows = []
+    import pytz
+    tz = pytz.timezone('Asia/Taipei')
+    for w in wallets:
+        # 計算折價券總數
+        txns = StoredValueTransaction.query.filter_by(wallet_id=w.id).all()
+        c500 = c300 = c100 = 0
+        for t in txns:
+            sign = 1 if t.type == 'topup' else -1
+            c500 += sign * (t.coupon_500_count or 0)
+            c300 += sign * (t.coupon_300_count or 0)
+            try:
+                c100 += sign * (getattr(t, 'coupon_100_count', 0) or 0)
+            except Exception:
+                pass
+        c500 = max(c500, 0)
+        c300 = max(c300, 0)
+        c100 = max(c100, 0)
+        # 若餘額與所有折價券皆為 0，從總表隱藏
+        if (w.balance or 0) == 0 and c500 == 0 and c300 == 0 and c100 == 0:
+            continue
+        wl = None
+        if w.whitelist_id:
+            wl = Whitelist.query.filter_by(id=w.whitelist_id).first()
+        # 累計儲值：所有 topup 交易金額相加
+        topups = StoredValueTransaction.query.filter_by(wallet_id=w.id, type='topup').all()
+        total_topup = sum(t.amount for t in topups if t.amount)
+        rows.append({
+            'phone': w.phone,
+            'nickname': (wl.name if wl and wl.name else '—'),
+            'code': (wl.id if wl else '—'),
+            'total_topup': total_topup,
+            'balance': w.balance,
+            'c500': c500,
+            'c300': c300,
+            'c100': c100,
+            'created_at': w.created_at.astimezone(tz).strftime('%Y/%m/%d %H:%M') if w.created_at else ''
+        })
+    return render_template('wallet_summary.html', rows=rows, count=len(rows), q=q)
+
+# ========= 儲值對帳（今日與區間） =========
+@admin_bp.route('/wallet/reconcile')
+def wallet_reconcile():
+    """對帳報表：顯示本日時段（12:00~次日03:00）儲值總額，並提供自訂日期區間查詢與明細、彙總、現金應收。"""
+    import pytz
+    from datetime import datetime as _dt, timedelta
+    import re
+    tz = pytz.timezone('Asia/Taipei')
+
+    # 取得查詢參數
+    preset = (request.args.get('preset') or '').strip()  # today, yesterday, thisweek, thismonth
+    start_str = (request.args.get('start') or '').strip()
+    end_str = (request.args.get('end') or '').strip()
+    export = (request.args.get('export') or '').strip()  # csv
+    cash_kw = (request.args.get('cash_kw') or 'TOPUP_CASH,現金').strip()
+    remark_kw = (request.args.get('remark_kw') or '').strip()  # 額外備註篩選
+    cash_keywords = [k.strip() for k in cash_kw.split(',') if k.strip()]
+
+    now_local = _dt.now(tz)
+
+    def business_day_window(base_date):
+        """回傳某個基準日期的會計日區間：當日 12:00 ~ 次日 03:00（半開區間）。"""
+        start_local = tz.localize(_dt(base_date.year, base_date.month, base_date.day, 12, 0, 0))
+        # 次日 03:00
+        next_day = start_local + timedelta(days=1)
+        end_local = tz.localize(_dt(next_day.year, next_day.month, next_day.day, 3, 0, 0))
+        return start_local, end_local
+
+    # 依現在時間決定「今日」基準（淩晨 00:00~03:00 視為前一會計日）
+    def current_business_base_date(now_dt):
+        if now_dt.hour < 3:  # 00:00~02:59 -> 前一日
+            return (now_dt - timedelta(days=1)).date()
+        return now_dt.date()
+
+    # 計算查詢區間
+    if preset in ('today', 'yesterday') and not start_str and not end_str:
+        base_date = current_business_base_date(now_local)
+        if preset == 'yesterday':
+            base_date = base_date - timedelta(days=1)
+        start_local, end_local = business_day_window(base_date)
+    elif preset == 'thisweek' and not start_str and not end_str:
+        # 本週（以週一為基準），使用會計日窗拼接至今
+        weekday = current_business_base_date(now_local).weekday()  # Monday=0
+        monday_date = current_business_base_date(now_local) - timedelta(days=weekday)
+        start_local, _ = business_day_window(monday_date)
+        _, end_local = business_day_window(current_business_base_date(now_local))
+    elif preset == 'thismonth' and not start_str and not end_str:
+        first_date = current_business_base_date(now_local).replace(day=1)
+        start_local, _ = business_day_window(first_date)
+        # 到當前會計日的結束
+        _, end_local = business_day_window(current_business_base_date(now_local))
+    else:
+        # 自訂日期以會計日窗解讀：起日的 12:00 到 迄日次日 03:00
+        if start_str:
+            try:
+                y, m, d = [int(x) for x in start_str.split('-')]
+                start_local, _ = business_day_window(_dt(y, m, d).date())
+            except Exception:
+                start_local, _ = business_day_window(now_local.date())
+        else:
+            start_local, _ = business_day_window(now_local.date())
+        if end_str:
+            try:
+                y2, m2, d2 = [int(x) for x in end_str.split('-')]
+                _, end_local = business_day_window(_dt(y2, m2, d2).date())
+            except Exception:
+                _, end_local = business_day_window(now_local.date())
+        else:
+            _, end_local = business_day_window(now_local.date())
+
+    # 轉為 UTC 過濾
+    start_utc = start_local.astimezone(pytz.utc)
+    end_utc = end_local.astimezone(pytz.utc)
+
+    # 查詢 topup 交易
+    q = (StoredValueTransaction.query
+         .filter(StoredValueTransaction.type == 'topup')
+         .filter(StoredValueTransaction.created_at >= start_utc)
+         .filter(StoredValueTransaction.created_at < end_utc)
+         .order_by(StoredValueTransaction.created_at.asc()))
+    txns = q.all()
+
+    # 明細與總計（儲值）
+    total_amount = sum(t.amount or 0 for t in txns)
+    count = len(txns)
+    avg_amount = (total_amount // count) if count else 0
+
+    # 同時期間的支出（consume）統計
+    consume_q = (StoredValueTransaction.query
+                 .filter(StoredValueTransaction.type == 'consume')
+                 .filter(StoredValueTransaction.created_at >= start_utc)
+                 .filter(StoredValueTransaction.created_at < end_utc))
+    consume_txns = consume_q.all()
+    consume_total = sum(t.amount or 0 for t in consume_txns)
+    consume_count = len(consume_txns)
+
+    # 取得電話/姓名/代號與本地時間字串（多重回填）
+    rows = []
+    phone_pattern = re.compile(r'(09\d{8})')
+    for t in txns:
+        wallet = StoredValueWallet.query.filter_by(id=t.wallet_id).first() if t.wallet_id else None
+        phone = None
+        nickname = '—'
+        code = '—'
+        wl = None
+        if wallet:
+            phone = wallet.phone or None
+            if wallet.whitelist_id:
+                wl = Whitelist.query.filter_by(id=wallet.whitelist_id).first()
+                if wl:
+                    nickname = wl.name or nickname
+                    code = wl.id
+                    # 若 wallet.phone 缺失，嘗試用 whitelist.phone 回填顯示
+                    if not phone:
+                        phone = getattr(wl, 'phone', None) or phone
+        # 若仍無 phone，嘗試從備註解析
+        remark_text = (t.remark or '')
+        if not phone:
+            m = phone_pattern.search(remark_text)
+            if m:
+                phone = m.group(1)
+        # 顯示字串
+        phone_display = phone if phone else '—'
+
+        # 本地時間字串
+        try:
+            import pytz as _p
+            utc = _p.utc
+            dt = t.created_at
+            if dt and dt.tzinfo is None:
+                dt = utc.localize(dt)
+            local_dt = dt.astimezone(tz) if dt else None
+            time_str = local_dt.strftime('%Y/%m/%d %H:%M') if local_dt else ''
+        except Exception:
+            time_str = t.created_at.strftime('%Y/%m/%d %H:%M') if t.created_at else ''
+
+        # 判斷是否屬於券使用（amount=0 且有任一 coupon 欄位）
+        coupon_only = False
+        if (t.type == 'topup' and (t.amount or 0) == 0 and (
+            getattr(t, 'coupon_500_count', 0) or getattr(t, 'coupon_300_count', 0) or getattr(t, 'coupon_100_count', 0)
+        )):
+            coupon_only = True
+        remark_show = '使用折價券' if coupon_only else remark_text[:120]
+        rows.append({
+            'id': t.id,
+            'time': time_str,
+            'phone': phone_display,
+            'nickname': nickname,
+            'code': code,
+            'amount': t.amount or 0,
+            'remark': remark_show,
+            'coupon_only': coupon_only,
+        })
+
+    # 備註過濾（若指定 remark_kw）
+    if remark_kw:
+        rows = [r for r in rows if (remark_kw in (r['remark'] or ''))]
+
+    # 依 remark 分組
+    by_remark = {}
+    for r in rows:
+        k = r['remark'] or '—'
+        by_remark.setdefault(k, {'amount': 0, 'count': 0})
+        by_remark[k]['amount'] += r['amount']
+        by_remark[k]['count'] += 1
+
+    # 依會計日（日）彙總：以 12:00~次日03:00 分群
+    by_day = {}
+    for t in txns:
+        dt = t.created_at
+        if dt and dt.tzinfo is None:
+            dt = pytz.utc.localize(dt)
+        local_dt = dt.astimezone(tz) if dt else None
+        if local_dt is None:
+            day_key = '—'
+        else:
+            # 將 00:00~02:59 歸屬前一日
+            bd_date = (local_dt - timedelta(days=1)).date() if local_dt.hour < 3 else local_dt.date()
+            day_key = bd_date.strftime('%Y-%m-%d')
+        by_day.setdefault(day_key, 0)
+        by_day[day_key] += (t.amount or 0)
+
+    # 現金應收：以關鍵字（remark 含任一關鍵字）快速計算
+    def is_cash_remark(text):
+        if not cash_keywords:
+            return False
+        lower = text.lower() if text else ''
+        for kw in cash_keywords:
+            if kw and (kw in text or kw.lower() in lower):
+                return True
+        return False
+    cash_total = sum(r['amount'] for r in rows if is_cash_remark(r['remark']))
+    cash_count = sum(1 for r in rows if is_cash_remark(r['remark']))
+
+    # ====== 無效紀錄與重複紀錄偵測 ======
+    invalid_rows = []
+    for r in rows:
+        # 無電話且有金額且備註包含儲值關鍵字或 TOPUP_CASH
+        if (r['phone'] == '—' and r['amount'] > 0 and (
+            'TOPUP_CASH' in (r['remark'] or '') or '儲值' in (r['remark'] or '')
+        )):
+            invalid_rows.append(r)
+
+    # 重複判斷：相同 phone != '—'、amount、remark（移除時以最晚時間保留一筆）
+    dup_groups = {}
+    for r in rows:
+        if r['phone'] == '—':
+            continue
+        key = (r['phone'], r['amount'], r['remark'])
+        dup_groups.setdefault(key, []).append(r)
+    duplicate_rows = []
+    for key, group in dup_groups.items():
+        if len(group) > 1:
+            # 依時間排序保留第一筆，其餘視為重複
+            # 時間字串格式 '%Y/%m/%d %H:%M'
+            try:
+                group_sorted = sorted(group, key=lambda x: x['time'])
+            except Exception:
+                group_sorted = group
+            # 保留第一筆，其餘列出
+            for rr in group_sorted[1:]:
+                duplicate_rows.append(rr)
+
+    # 自動清理無效紀錄（選項）
+    clean_invalid = request.args.get('clean_invalid') == '1'
+    if clean_invalid and invalid_rows:
+        removed_ids = []
+        for r in invalid_rows:
+            tdel = StoredValueTransaction.query.filter_by(id=r['id']).first()
+            if tdel:
+                # 還原餘額（topup 則扣回）避免影響餘額
+                if tdel.type == 'topup' and tdel.amount:
+                    wallet = StoredValueWallet.query.filter_by(id=tdel.wallet_id).first()
+                    if wallet:
+                        wallet.balance -= tdel.amount
+                        wallet.updated_at = datetime.utcnow()
+                db.session.delete(tdel)
+                removed_ids.append(r['id'])
+        db.session.commit()
+        flash(f'已自動清理 {len(removed_ids)} 筆無效交易','info')
+        # 重新導向以刷新
+        return redirect(url_for('admin.wallet_reconcile'))
+
+    # CSV 匯出
+    if export == 'csv':
+        import csv
+        from io import StringIO
+        si = StringIO()
+        cw = csv.writer(si)
+        cw.writerow(['ID', '時間(台北)', '手機', '名稱', '編號', '金額', '備註'])
+        for r in rows:
+            cw.writerow([r['id'], r['time'], r['phone'], r['nickname'], r['code'], r['amount'], r['remark']])
+        output = si.getvalue()
+        from flask import Response
+        filename = f"wallet_topups_{start_local.strftime('%Y%m%d_%H%M')}_{end_local.strftime('%Y%m%d_%H%M')}.csv"
+        return Response(output, mimetype='text/csv', headers={'Content-Disposition': f'attachment; filename="{filename}"'})
+
+    # 本日時段總額（以會計日理解）
+    base_today = current_business_base_date(now_local)
+    today_start_local, today_end_local = business_day_window(base_today)
+    today_q = (StoredValueTransaction.query
+               .filter(StoredValueTransaction.type == 'topup')
+               .filter(StoredValueTransaction.created_at >= today_start_local.astimezone(pytz.utc))
+               .filter(StoredValueTransaction.created_at < today_end_local.astimezone(pytz.utc)))
+    today_total = sum(t.amount or 0 for t in today_q.all())
+
+    return render_template('wallet_reconcile.html',
+                           rows=rows,
+                           total_amount=total_amount,
+                           count=count,
+                           avg_amount=avg_amount,
+                           by_remark=by_remark,
+                           by_day=by_day,
+                           preset=preset,
+                           start=start_str,
+                           end=end_str,
+                           cash_kw=cash_kw,
+                           remark_kw=remark_kw,
+                           cash_total=cash_total,
+                           cash_count=cash_count,
+                           consume_total=consume_total,
+                           consume_count=consume_count,
+                           invalid_rows=invalid_rows,
+                           duplicate_rows=duplicate_rows,
+                           today_total=today_total,
+                           start_local_display=(start_local.strftime('%Y-%m-%d %H:%M')),
+                           end_local_display=(end_local.strftime('%Y-%m-%d %H:%M')))
+
+@admin_bp.route('/wallet/reconcile/consume')
+def wallet_reconcile_consume():
+    """扣款對帳：顯示 consume 交易，區分使用儲值金與使用折價券（僅券），同會計時段與篩選。"""
+    import pytz
+    from datetime import datetime as _dt, timedelta
+    tz = pytz.timezone('Asia/Taipei')
+    preset = (request.args.get('preset') or '').strip()
+    start_str = (request.args.get('start') or '').strip()
+    end_str = (request.args.get('end') or '').strip()
+    remark_kw = (request.args.get('remark_kw') or '').strip()
+
+    now_local = _dt.now(tz)
+    def business_day_window(base_date):
+        start_local = tz.localize(_dt(base_date.year, base_date.month, base_date.day, 12, 0, 0))
+        next_day = start_local + timedelta(days=1)
+        end_local = tz.localize(_dt(next_day.year, next_day.month, next_day.day, 3, 0, 0))
+        return start_local, end_local
+    def current_business_base_date(now_dt):
+        if now_dt.hour < 3:
+            return (now_dt - timedelta(days=1)).date()
+        return now_dt.date()
+    if preset in ('today','yesterday') and not start_str and not end_str:
+        base_date = current_business_base_date(now_local)
+        if preset=='yesterday':
+            base_date = base_date - timedelta(days=1)
+        start_local, end_local = business_day_window(base_date)
+    elif preset=='thisweek' and not start_str and not end_str:
+        weekday = current_business_base_date(now_local).weekday()
+        monday_date = current_business_base_date(now_local) - timedelta(days=weekday)
+        start_local,_ = business_day_window(monday_date)
+        _,end_local = business_day_window(current_business_base_date(now_local))
+    elif preset=='thismonth' and not start_str and not end_str:
+        first_date = current_business_base_date(now_local).replace(day=1)
+        start_local,_ = business_day_window(first_date)
+        _,end_local = business_day_window(current_business_base_date(now_local))
+    else:
+        if start_str:
+            try:
+                y,m,d = [int(x) for x in start_str.split('-')]
+                start_local,_ = business_day_window(_dt(y,m,d).date())
+            except Exception:
+                start_local,_ = business_day_window(now_local.date())
+        else:
+            start_local,_ = business_day_window(now_local.date())
+        if end_str:
+            try:
+                y2,m2,d2 = [int(x) for x in end_str.split('-')]
+                _,end_local = business_day_window(_dt(y2,m2,d2).date())
+            except Exception:
+                _,end_local = business_day_window(now_local.date())
+        else:
+            _,end_local = business_day_window(now_local.date())
+    start_utc = start_local.astimezone(pytz.utc)
+    end_utc = end_local.astimezone(pytz.utc)
+    txns = (StoredValueTransaction.query
+            .filter(StoredValueTransaction.type=='consume')
+            .filter(StoredValueTransaction.created_at>=start_utc)
+            .filter(StoredValueTransaction.created_at<end_utc)
+            .order_by(StoredValueTransaction.created_at.asc()).all())
+    rows = []
+    stored_sum = 0
+    coupon_only_sum = 0
+    import re
+    phone_pattern = re.compile(r'(09\d{8})')
+    for t in txns:
+        wallet = StoredValueWallet.query.filter_by(id=t.wallet_id).first() if t.wallet_id else None
+        phone = wallet.phone if wallet and wallet.phone else None
+        wl = None
+        nickname = '—'
+        code = '—'
+        if wallet and wallet.whitelist_id:
+            wl = Whitelist.query.filter_by(id=wallet.whitelist_id).first()
+            if wl:
+                nickname = wl.name or nickname
+                code = wl.id
+                if not phone:
+                    phone = getattr(wl,'phone',None) or phone
+        if not phone and t.remark:
+            m = phone_pattern.search(t.remark)
+            if m:
+                phone = m.group(1)
+        phone_display = phone if phone else '—'
+        # 判斷使用儲值金或使用折價券
+        coupon_used = (getattr(t,'coupon_500_count',0) or 0) + (getattr(t,'coupon_300_count',0) or 0) + (getattr(t,'coupon_100_count',0) or 0)
+        is_coupon_only = (t.amount or 0) == 0 and coupon_used > 0
+        if is_coupon_only:
+            coupon_only_sum += coupon_used  # 以券面值顯示總量? 暫記張數合計
+        else:
+            stored_sum += (t.amount or 0)
+        # 顯示 remark
+        remark_show = '使用折價券' if is_coupon_only else (t.remark or '')
+        # 本地時間
+        try:
+            import pytz as _p
+            dt = t.created_at
+            if dt and dt.tzinfo is None:
+                dt = _p.utc.localize(dt)
+            local_dt = dt.astimezone(tz) if dt else None
+            time_str = local_dt.strftime('%Y/%m/%d %H:%M') if local_dt else ''
+        except Exception:
+            time_str = t.created_at.strftime('%Y/%m/%d %H:%M') if t.created_at else ''
+        rows.append({
+            'id': t.id,
+            'time': time_str,
+            'phone': phone_display,
+            'nickname': nickname,
+            'code': code,
+            'amount': t.amount or 0,
+            'remark': remark_show,
+            'coupon_only': is_coupon_only,
+            'coupon_used': coupon_used,
+        })
+    if remark_kw:
+        rows = [r for r in rows if remark_kw in (r['remark'] or '')]
+    stored_count = sum(1 for r in rows if not r['coupon_only'])
+    coupon_only_count = sum(1 for r in rows if r['coupon_only'])
+    return render_template('wallet_reconcile_consume.html',
+                           rows=rows,
+                           stored_sum=stored_sum,
+                           stored_count=stored_count,
+                           coupon_only_sum=coupon_only_sum,
+                           coupon_only_count=coupon_only_count,
+                           preset=preset,
+                           remark_kw=remark_kw,
+                           start_local_display=start_local.strftime('%Y-%m-%d %H:%M'),
+                           end_local_display=end_local.strftime('%Y-%m-%d %H:%M'))
 
 
 def _get_or_create_wallet_by_phone(phone):
@@ -285,9 +791,13 @@ def wallet_topup():
     raw_remark = (request.form.get('remark') or '').strip()
     c500 = int(request.form.get('coupon_500_count') or 0)
     c300 = int(request.form.get('coupon_300_count') or 0)
-    if amount < 0:
-        flash('金額不可為負數','warning')
+    c100 = int(request.form.get('coupon_100_count') or 0)
+    if amount <= 0:
+        flash('儲值金額必須大於 0','warning')
         return redirect(url_for('admin.wallet_home', q=phone))
+    if not phone:
+        flash('缺少有效手機號碼，無法儲值','danger')
+        return redirect(url_for('admin.wallet_home'))
     wallet = _get_or_create_wallet_by_phone(phone)
     wallet.balance += amount
     wallet.updated_at = datetime.utcnow()
@@ -298,6 +808,10 @@ def wallet_topup():
     txn.remark = raw_remark if raw_remark else 'TOPUP_CASH'
     txn.coupon_500_count = c500
     txn.coupon_300_count = c300
+    try:
+        txn.coupon_100_count = c100
+    except Exception:
+        pass
     db.session.add(txn)
     db.session.commit()
     flash(f'已為 {phone} 儲值 {amount} 元，餘額 {wallet.balance}','success')
@@ -311,6 +825,7 @@ def wallet_consume():
     raw_remark = (request.form.get('remark') or '').strip()
     c500 = int(request.form.get('coupon_500_count') or 0)
     c300 = int(request.form.get('coupon_300_count') or 0)
+    c100 = int(request.form.get('coupon_100_count') or 0)
     wallet = _get_or_create_wallet_by_phone(phone)
     if amount < 0:
         flash('金額不可為負數','warning')
@@ -327,7 +842,48 @@ def wallet_consume():
     txn.remark = raw_remark if raw_remark else 'CONSUME_SERVICE'
     txn.coupon_500_count = c500
     txn.coupon_300_count = c300
+    try:
+        txn.coupon_100_count = c100
+    except Exception:
+        pass
     db.session.add(txn)
     db.session.commit()
     flash(f'已為 {phone} 扣款 {amount} 元，餘額 {wallet.balance}','info')
     return redirect(url_for('admin.wallet_home', q=phone))
+
+@admin_bp.route('/wallet/txn/delete', methods=['POST'])
+def wallet_txn_delete():
+    tid = request.form.get('id')
+    q = request.form.get('q') or ''
+    redirect_url = (request.form.get('redirect_url') or '').strip()
+    if not tid:
+        flash('缺少交易 ID','warning')
+        return redirect(url_for('admin.wallet_home', q=q))
+    t = StoredValueTransaction.query.filter_by(id=tid).first()
+    if not t:
+        flash('找不到交易紀錄','danger')
+        return redirect(url_for('admin.wallet_home', q=q))
+    try:
+        wallet = StoredValueWallet.query.filter_by(id=t.wallet_id).first()
+        # 還原餘額（topup 則扣回，consume 則加回）
+        if wallet:
+            if t.type == 'topup':
+                wallet.balance -= (t.amount or 0)
+            elif t.type == 'consume':
+                wallet.balance += (t.amount or 0)
+            wallet.updated_at = datetime.utcnow()
+        db.session.delete(t)
+        db.session.commit()
+        # 若該錢包已無交易且餘額為 0，刪除錢包紀錄（保持總表乾淨）
+        if wallet:
+            remain_txn = StoredValueTransaction.query.filter_by(wallet_id=wallet.id).count()
+            if remain_txn == 0 and (wallet.balance or 0) == 0:
+                db.session.delete(wallet)
+                db.session.commit()
+        flash('已刪除交易並同步更新餘額','info')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'刪除失敗：{e}','danger')
+    if redirect_url:
+        return redirect(redirect_url)
+    return redirect(url_for('admin.wallet_home', q=q))

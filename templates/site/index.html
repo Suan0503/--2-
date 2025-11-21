@@ -1,0 +1,29 @@
+{% extends 'site/base.html' %}
+{% block content %}
+<h2>近期班表</h2>
+<div>
+  {% for s in schedules %}
+    <div style="padding:8px 0;border-bottom:1px dashed #999;">
+      <strong>{{ s.girl_name }}</strong>
+      <span>｜{{ s.start_time.strftime('%Y/%m/%d %H:%M') }} / {{ s.duration_min }} 分</span>
+      {% if s.price %}<span>｜$ {{ s.price }}</span>{% endif %}
+      {% if s.room %}<span>｜房 {{ s.room }}</span>{% endif %}
+    </div>
+  {% else %}
+    <p>尚無資料</p>
+  {% endfor %}
+</div>
+
+<h2 style="margin-top:24px">最新回報</h2>
+<div>
+  {% for p in posts %}
+    <div style="padding:8px 0;border-bottom:1px dashed #999;">
+      <a href="#"><strong>{{ p.title }}</strong></a>
+      {% if p.price %}<span>｜$ {{ p.price }}</span>{% endif %}
+      <div style="color:#ccc;font-size:14px;">{{ p.created_at.strftime('%Y/%m/%d %H:%M') }}</div>
+    </div>
+  {% else %}
+    <p>尚無貼文</p>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -4,17 +4,16 @@ from extensions import line_bot_api
 from storage import ADMIN_IDS  # 管理員清單
 from secrets import choice as secrets_choice
 
-# ================= 魔法學院配色（可依喜好微調） - 現代化調整 =================
-# 簡潔現代主題：深色底，輔以亮色強調，按鈕風格調整
-MAG_BG_1   = "#212121"  # 深灰（頁1底，更現代）
-MAG_BG_2   = "#121212"  # 幾乎黑（頁2底）
-MAG_GOLD   = "#FFD700"  # 亮金色/強調
-MAG_PARCH  = "#B0BEC5"  # 羊皮紙灰（輔助文字）
-MAG_BURG   = "#E53935"  # 亮紅色（警示/主要操作）
-MAG_EMER   = "#00C853"  # 亮綠色（成功/功能）
-MAG_INDIGO = "#3F51B5"  # 亮藍色（主要按鈕）
-MAG_PURPLE = "#8E24AA"  # 紫色（次要強調）
-MAG_STEEL  = "#424242"  # 鋼灰（分隔線）
+# ================= 聖誕主題配色 =================
+XMAS_BG_1   = "#0B3D2E"  # 深綠
+XMAS_BG_2   = "#072A20"  # 更深綠
+XMAS_GOLD   = "#FFD700"  # 金色
+XMAS_SNOW   = "#F5F5F5"  # 雪白
+XMAS_RED    = "#C62828"  # 聖誕紅
+XMAS_GREEN  = "#2E7D32"  # 松樹綠
+XMAS_ACCENT = "#00897B"  # 冬日青綠
+XMAS_PURPLE = "#6A1B9A"  # 點綴紫
+XMAS_BORDER = "#1B5E20"  # 深綠分隔線
 
 # ====== 共用：隨機客服/預約群連結 ======
 def choose_link():
@@ -39,21 +38,20 @@ JKF_LINKS = [
     {"label": "本期空缺中",         "url": "https://www.jkforum.net/p/thread-15744749-1-1.html"},
 ]
 
-# ====== 廣告專區（魔法學院主題）======
+# ====== 廣告專區（聖誕主題）======
 def get_ad_menu():
-    btn_primary   = MAG_INDIGO   # 亮藍色
-    btn_secondary = MAG_PURPLE   # 紫色
+    btn_primary   = XMAS_RED
+    btn_secondary = XMAS_GREEN
 
     buttons = []
     for i, link in enumerate(JKF_LINKS):
         buttons.append({
             "type": "button",
             "action": {"type": "uri", "label": link["label"], "uri": link["url"]},
-            "style": "primary",  # 白色文字
+            "style": "primary",
             "color": btn_primary if i % 2 == 0 else btn_secondary
         })
 
-    # 回主選單
     buttons.append({
         "type": "button",
         "action": {"type": "message", "label": "🏛️ 回主選單", "text": "主選單"},
@@ -68,24 +66,24 @@ def get_ad_menu():
             "header": {
                 "type": "box",
                 "layout": "vertical",
-                "backgroundColor": MAG_BG_2,
+                "backgroundColor": XMAS_BG_2,
                 "paddingAll": "16px",
                 "contents": [{
                     "type": "text",
-                    "text": "✨ 茗殿廣告資訊站",
+                    "text": "🎄 茗殿廣告資訊站",
                     "weight": "bold",
                     "size": "lg",
                     "align": "center",
-                    "color": MAG_GOLD
+                    "color": XMAS_GOLD
                 }]
             },
             "body": {
                 "type": "box",
                 "layout": "vertical",
-                "backgroundColor": MAG_BG_2,
+                "backgroundColor": XMAS_BG_2,
                 "spacing": "md",
                 "contents": [
-                    {"type": "separator", "color": MAG_STEEL},
+                    {"type": "separator", "color": XMAS_BORDER},
                     {"type": "box", "layout": "vertical", "spacing": "sm", "margin": "lg", "contents": buttons}
                 ]
             },
@@ -93,161 +91,90 @@ def get_ad_menu():
         }
     )
 
-# ====== 魔法學院主選單（兩頁 Carousel）- **更新版** ======
+# ====== 聖誕主選單（兩頁 Carousel） ======
 def get_menu_carousel():
-    # 新現代主題配色
-    COLOR_PRIMARY = MAG_INDIGO
-    COLOR_ACCENT = MAG_EMER
-    COLOR_SECONDARY = MAG_PURPLE
-    COLOR_GRAY = MAG_PARCH
-    COLOR_ALERT = MAG_BURG
+    COLOR_PRIMARY = XMAS_RED
+    COLOR_ACCENT = XMAS_GREEN
+    COLOR_SECONDARY = XMAS_ACCENT
+    COLOR_GRAY = XMAS_SNOW
+    COLOR_ALERT = XMAS_PURPLE
 
-    # 第一頁 - 主功能
     page1 = {
         "type": "bubble",
         "size": "mega",
         "header": {
             "type": "box",
             "layout": "vertical",
-            "backgroundColor": MAG_BG_1,
+            "backgroundColor": XMAS_BG_1,
             "paddingAll": "16px",
             "contents": [{
                 "type": "text",
-                "text": "✨ 茗殿選單 1/2",
+                "text": "🎄 茗殿選單 1/2",
                 "weight": "bold",
                 "align": "center",
                 "size": "lg",
-                "color": MAG_GOLD
+                "color": XMAS_GOLD
             }]
         },
         "body": {
             "type": "box",
             "layout": "vertical",
-            "backgroundColor": MAG_BG_1,
+            "backgroundColor": XMAS_BG_1,
             "spacing": "md",
             "contents": [
-                {"type": "separator", "color": MAG_STEEL},
+                {"type": "separator", "color": XMAS_BORDER},
                 {
                     "type": "box",
                     "layout": "vertical",
                     "margin": "lg",
                     "spacing": "sm",
                     "contents": [
-                        # 1. 我的驗證
-                        {
-                            "type": "button",
-                            "action": {"type": "message", "label": "🔑 我的驗證", "text": "驗證資訊"},
-                            "style": "primary",
-                            "color": COLOR_PRIMARY
-                        },
-                        # 2. 每日抽獎
-                        {
-                            "type": "button",
-                            "action": {"type": "message", "label": "🎁 每日抽獎", "text": "每日抽獎"},
-                            "style": "primary",
-                            "color": COLOR_ACCENT
-                        },
-                        # 3. 廣告專區
-                        {
-                            "type": "button",
-                            "action": {"type": "message", "label": "📢 廣告專區", "text": "廣告專區"},
-                            "style": "primary",
-                            "color": COLOR_SECONDARY
-                        },
-                        # 4. 班表查詢
-                        {
-                            "type": "button",
-                            "action": {"type": "uri", "label": "🗓️ 班表查詢", "uri": "https://t.me/+svlFjBpb4hxkYjFl"},
-                            "style": "secondary",
-                            "color": COLOR_GRAY
-                        },
-                        # 5. 預約專線
-                        {
-                            "type": "button",
-                            "action": {"type": "uri", "label": "📲 預約諮詢", "uri": choose_link()},
-                            "style": "secondary",
-                            "color": COLOR_ALERT
-                        }
+                        {"type": "button", "action": {"type": "message", "label": "🔑 我的驗證", "text": "驗證資訊"}, "style": "primary", "color": COLOR_PRIMARY},
+                        {"type": "button", "action": {"type": "message", "label": "🎁 每日抽獎", "text": "每日抽獎"}, "style": "primary", "color": COLOR_ACCENT},
+                        {"type": "button", "action": {"type": "message", "label": "📢 廣告專區", "text": "廣告專區"}, "style": "primary", "color": COLOR_SECONDARY},
+                        {"type": "button", "action": {"type": "uri", "label": "🗓️ 班表查詢", "uri": "https://t.me/+svlFjBpb4hxkYjFl"}, "style": "secondary", "color": COLOR_GRAY},
+                        {"type": "button", "action": {"type": "uri", "label": "📲 預約諮詢", "uri": choose_link()}, "style": "secondary", "color": COLOR_ALERT}
                     ]
                 }
             ]
         }
     }
 
-    # 第二頁 - 互動與服務
     page2 = {
         "type": "bubble",
         "size": "mega",
         "header": {
             "type": "box",
             "layout": "vertical",
-            "backgroundColor": MAG_BG_2,
+            "backgroundColor": XMAS_BG_2,
             "paddingAll": "16px",
             "contents": [{
                 "type": "text",
-                "text": "🔧 茗殿選單 2/2",
+                "text": "🎄 茗殿選單 2/2",
                 "weight": "bold",
                 "align": "center",
                 "size": "lg",
-                "color": MAG_GOLD
+                "color": XMAS_GOLD
             }]
         },
         "body": {
             "type": "box",
             "layout": "vertical",
-            "backgroundColor": MAG_BG_2,
+            "backgroundColor": XMAS_BG_2,
             "spacing": "md",
             "contents": [
-                {"type": "separator", "color": MAG_STEEL},
+                {"type": "separator", "color": XMAS_BORDER},
                 {
                     "type": "box",
                     "layout": "vertical",
                     "margin": "lg",
                     "spacing": "sm",
                     "contents": [
-                        # 1. 聊天社群
-                        {
-                            "type": "button",
-                            "action": {
-                                "type": "uri",
-                                "label": "💬 聊天社群",
-                                "uri": "https://line.me/ti/g2/mq8VqBIVupL1lsIXuAulnqZNz5vw7VKrVYjNDg?utm_source=invitation&utm_medium=link_copy&utm_campaign=default"
-                            },
-                            "style": "primary",
-                            "color": COLOR_ACCENT
-                        },
-                        # 2. 優惠券專區
-                        {
-                            "type": "button",
-                            "action": {"type": "message", "label": "💸 優惠券專區", "text": "折價券管理"},
-                            "style": "primary",
-                            "color": COLOR_PRIMARY
-                        },
-                        # 2.5. 儲值金專區
-                        {
-                            "type": "button",
-                            "action": {"type": "message", "label": "💳 儲值金專區", "text": "儲值金"},
-                            "style": "primary",
-                            "color": COLOR_ACCENT
-                        },
-                        # 3. 呼叫管理員
-                        {
-                            "type": "button",
-                            "action": {
-                                "type": "message",
-                                "label": "☎️ 服務專線",
-                                "text": "📞 茗殿熱線：0987-346-208\n歡迎來電洽詢，專人即時服務！"
-                            },
-                            "style": "primary",
-                            "color": COLOR_ALERT
-                        },
-                        # 4. 最新活動
-                        {
-                            "type": "button",
-                            "action": {"type": "message", "label": "🌟 最新活動", "text": "活動快訊"},
-                            "style": "primary",
-                            "color": COLOR_SECONDARY
-                        }
+                        {"type": "button", "action": {"type": "uri", "label": "💬 聊天社群", "uri": "https://line.me/ti/g2/mq8VqBIVupL1lsIXuAulnqZNz5vw7VKrVYjNDg?utm_source=invitation&utm_medium=link_copy&utm_campaign=default"}, "style": "primary", "color": COLOR_ACCENT},
+                        {"type": "button", "action": {"type": "message", "label": "💸 優惠券專區", "text": "折價券管理"}, "style": "primary", "color": COLOR_PRIMARY},
+                        {"type": "button", "action": {"type": "message", "label": "💳 儲值金專區", "text": "儲值金"}, "style": "primary", "color": COLOR_ACCENT},
+                        {"type": "button", "action": {"type": "message", "label": "☎️ 服務專線", "text": "📞 茗殿熱線：0987-346-208\n歡迎來電洽詢，專人即時服務！"}, "style": "primary", "color": COLOR_ALERT},
+                        {"type": "button", "action": {"type": "message", "label": "🌟 最新活動", "text": "活動快訊"}, "style": "primary", "color": COLOR_SECONDARY}
                     ]
                 }
             ]
@@ -255,7 +182,7 @@ def get_menu_carousel():
     }
 
     return FlexSendMessage(
-        alt_text="茗殿現代主選單",
+        alt_text="聖誕節主選單",
         contents={"type": "carousel", "contents": [page1, page2]}
     )
 
@@ -272,7 +199,6 @@ def reply_with_ad_menu(reply_token):
 
 # ====== 呼叫管理員推播 =======
 def notify_admins(user_id, display_name=None):
-    # 避免硬性相依：在使用時才 import
     from models import Whitelist
     user = Whitelist.query.filter_by(line_user_id=user_id).first()
 

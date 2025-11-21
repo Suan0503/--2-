@@ -1,0 +1,23 @@
+{% extends 'admin_custom_master.html' %}
+{% block body %}
+<div class="container" style="max-width:960px;margin:0 auto;">
+  <header style="display:flex;justify-content:space-between;align-items:center;padding:16px 0;">
+    <a href="/" style="text-decoration:none;color:#ffe082;font-weight:700;">茗殿 Plaza</a>
+    <nav>
+      <a href="/" style="margin-right:12px;">首頁</a>
+      <a href="/dashboard">管理</a>
+    </nav>
+  </header>
+  <hr>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <ul class="flashes">
+      {% for category, message in messages %}
+        <li class="flash {{ category }}">{{ message }}</li>
+      {% endfor %}
+      </ul>
+    {% endif %}
+  {% endwith %}
+  {% block content %}{% endblock %}
+</div>
+{% endblock %}

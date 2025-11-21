@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <title>儲值金總表</title>
+  <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    body{font-family:'Zen Maru Gothic','微軟正黑體',sans-serif;background:#f4f6f8;margin:0;color:#444}
+    .header{padding:20px;text-align:center;background:#e0f2f1;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+    .header a{display:inline-block;margin:6px 8px;background:#00897b;color:#fff;padding:8px 12px;border-radius:10px;text-decoration:none;font-size:.85rem}
+    .container{max-width:1200px;margin:24px auto;padding:0 18px}
+    table{width:100%;border-collapse:collapse;font-size:.85rem}
+    th,td{border-bottom:1px solid #e0e0e0;padding:8px 10px;text-align:left}
+    thead tr{background:#00695c;color:#fff}
+    tr:hover{background:#fafafa}
+    .count{margin:10px 0;font-size:.8rem;color:#555}
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h2>💳 儲值金總表</h2>
+    <a href="/admin/wallet">單一查詢</a>
+    <a href="/admin/home">回後台主頁</a>
+  </div>
+  <div class="container">
+    <form method="get" action="/admin/wallet/summary" style="display:flex;gap:10px;margin-bottom:10px">
+      <input type="text" name="q" value="{{ q or '' }}" placeholder="輸入手機號碼搜尋" style="flex:1;padding:8px 10px;border:1px solid #b2dfdb;border-radius:8px">
+      <button type="submit" style="background:#00897b;color:#fff;border:none;padding:8px 14px;border-radius:10px">搜尋</button>
+    </form>
+    <div class="count">共 {{ count }} 筆錢包</div>
+    <table>
+      <thead>
+        <tr>
+          <th>手機號碼</th>
+          <th>暱稱</th>
+          <th>白名單編號</th>
+          <th>累計儲值金額</th>
+          <th>目前餘額</th>
+          <th>500券</th>
+          <th>300券</th>
+          <th>100券</th>
+          <th>建立時間</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td><a href="/admin/wallet?q={{ r.phone }}" style="color:#00695c;text-decoration:none">{{ r.phone }}</a></td>
+          <td>{{ r.nickname }}</td>
+          <td>{{ r.code }}</td>
+          <td>{{ r.total_topup }}</td>
+          <td>{{ r.balance }}</td>
+          <td>{{ r.c500 }}</td>
+          <td>{{ r.c300 }}</td>
+          <td>{{ r.c100 }}</td>
+          <td>{{ r.created_at }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</body>
+</html>

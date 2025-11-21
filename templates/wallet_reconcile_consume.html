@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <title>扣款對帳</title>
+  <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    body{font-family:'Zen Maru Gothic','微軟正黑體',sans-serif;background:#f7f9fb;margin:0;color:#333}
+    .header{padding:20px;text-align:center;background:#ede7f6;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+    .header a{display:inline-block;margin:6px 8px;background:#673ab7;color:#fff;padding:8px 12px;border-radius:10px;text-decoration:none;font-size:.75rem}
+    .container{max-width:1200px;margin:24px auto;padding:0 18px}
+    .card{background:#fff;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.06);padding:16px;margin-bottom:16px}
+    table{width:100%;border-collapse:collapse;font-size:.8rem}
+    th,td{border-bottom:1px solid #e0e0e0;padding:6px 8px;text-align:left}
+    thead tr{background:#512da8;color:#fff}
+    tr:hover{background:#fafafa}
+    .pill{background:#ede7f6;color:#311b92;border-radius:999px;padding:6px 10px;font-size:.7rem;display:inline-block;margin:4px 6px}
+    input,select{padding:6px 8px;border:1px solid #cfd8dc;border-radius:8px;font-size:.75rem}
+    button{background:#512da8;border:none;color:#fff;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:.75rem}
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h2 style="margin:0">💸 扣款對帳</h2>
+    <a href="/admin/wallet">儲值金專區</a>
+    <a href="/admin/wallet/reconcile">儲值對帳</a>
+    <a href="/admin/wallet/summary">儲值記錄</a>
+  </div>
+  <div class="container">
+    <div class="card">
+      <div>
+        <span class="pill">查詢區間：{{ start_local_display }} ~ {{ end_local_display }}</span>
+        <span class="pill">使用儲值金：{{ stored_sum }} 元（{{ stored_count }} 筆）</span>
+        <span class="pill" title="金額為 0 且使用折價券">使用折價券：{{ coupon_only_count }} 筆</span>
+      </div>
+      <form method="get" action="/admin/wallet/reconcile/consume" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px">
+        <label>快速區間</label>
+        <select name="preset" onchange="this.form.submit()">
+          <option value="">自訂</option>
+          <option value="today" {% if preset=='today' %}selected{% endif %}>今日</option>
+          <option value="yesterday" {% if preset=='yesterday' %}selected{% endif %}>昨日</option>
+          <option value="thisweek" {% if preset=='thisweek' %}selected{% endif %}>本週</option>
+          <option value="thismonth" {% if preset=='thismonth' %}selected{% endif %}>本月</option>
+        </select>
+        <label>備註關鍵字</label>
+        <input type="text" name="remark_kw" value="{{ remark_kw or '' }}" placeholder="輸入關鍵字" />
+        <button type="submit">查詢</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h3 style="margin:0 0 6px">明細</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>時間(台北)</th>
+            <th>手機</th>
+            <th>名稱</th>
+            <th>編號</th>
+            <th>金額</th>
+            <th>折價券使用</th>
+            <th>備註</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in rows %}
+          <tr>
+            <td>{{ r.id }}</td>
+            <td>{{ r.time }}</td>
+            <td>{% if r.phone and r.phone!='—' %}<a href="/admin/wallet?q={{ r.phone }}" style="color:#512da8;text-decoration:none">{{ r.phone }}</a>{% else %}—{% endif %}</td>
+            <td>{{ r.nickname }}</td>
+            <td>{{ r.code }}</td>
+            <td>{{ r.amount }}</td>
+            <td>{{ r.coupon_used }}</td>
+            <td>{{ r.remark }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</body>
+</html>
