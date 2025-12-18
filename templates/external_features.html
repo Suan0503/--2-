@@ -1,0 +1,41 @@
+{% extends 'base_modern.html' %}
+{% block title %}功能開關{% endblock %}
+{% block content %}
+  <div class="wrap">
+    <div class="card">
+      <h2 style="margin-top:0">外部功能開關</h2>
+  <p style="text-align:right"><a href="/MT_System/logout" style="color:#1976d2;text-decoration:none">登出</a></p>
+      {% if remaining_days is not none %}
+      <p>會員剩餘天數：<strong>{{ remaining_days }}</strong> 天</p>
+      {% endif %}
+  <p>
+        <a href="{{ url_for('external.admin_dashboard') }}">超級管理員儀表板</a> |
+        <a href="{{ url_for('external.company_dashboard') }}">公司管理儀表板</a>
+  |
+  <a href="{{ url_for('external.admin_embed') }}">嵌入管理頁</a>
+      </p>
+      <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        <table>
+          <thead>
+            <tr><th>功能</th><th>描述</th><th>狀態</th></tr>
+          </thead>
+          <tbody>
+            {% for f in flags %}
+            <tr>
+              <td>{{ f.name }}</td>
+              <td>{{ f.description or '—' }}</td>
+              <td>
+                <label>
+                  <input type="checkbox" name="flag_{{ f.key }}" {% if f.enabled %}checked{% endif %} /> 啟用
+                </label>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <div style="margin-top:12px"><button type="submit">儲存</button></div>
+      </form>
+    </div>
+  </div>
+{% endblock %}

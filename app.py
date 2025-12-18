@@ -19,6 +19,7 @@ from flask_migrate import Migrate
 from routes.message import message_bp
 from routes.pending_verify import pending_bp
 from routes.admin import admin_bp
+from routes.external import external_bp
 from models import Whitelist, Blacklist, TempVerify, Coupon
 import secrets
 
@@ -86,6 +87,23 @@ try:
                 except Exception:
                     db.session.rollback()
     scheduler.add_job(expire_coupons_job, 'cron', hour=0, minute=10, id='expire_coupons_daily')
+
+    # 每日 02:00 自動清除「待驗證名單」（temp_verify 狀態為 pending）
+    def clear_pending_verify_job():
+        from models import TempVerify
+        try:
+            # 僅刪除仍為 pending 的暫存驗證資料
+            pending = TempVerify.query.filter_by(status='pending').all()
+            for item in pending:
+                db.session.delete(item)
+            if pending:
+                db.session.commit()
+            else:
+                db.session.rollback()
+        except Exception:
+            db.session.rollback()
+
+    scheduler.add_job(clear_pending_verify_job, 'cron', hour=2, minute=0, id='clear_pending_verify_daily')
     scheduler.start()
 except Exception:
     pass  # 若未安裝 apscheduler 則略過排程功能
@@ -95,6 +113,7 @@ app.register_blueprint(message_bp)
 csrf.exempt(message_bp)  # 豁免 LINE Webhook /callback 不使用 CSRF Token
 app.register_blueprint(pending_bp)
 app.register_blueprint(admin_bp)
+app.register_blueprint(external_bp)
 
 """admin 相關路由已移至 routes/admin.py 的 Blueprint"""
 
@@ -126,6 +145,13 @@ def search():
         for c in cp:
             results.append({'type':'抽獎券','line_user_id':c.line_user_id,'report_no':c.report_no,'amount':c.amount})
     return render_template('search_result.html', q=q, results=results)
+
+@app.errorhandler(404)
+def not_found(e):
+    try:
+        return render_template('404_modern.html'), 404
+    except Exception:
+        return 'Not Found', 404
 
 @app.route('/line_status')
 def line_status():
@@ -272,6 +298,123 @@ with app.app_context():
                     db.session.commit()
         except Exception:
             db.session.rollback()
+
+    # 兼容補丁：精準對帳欄位（payment_method, reference_id, operator）
+    try:
+        db.session.execute(text("ALTER TABLE stored_value_txn ADD COLUMN IF NOT EXISTS payment_method VARCHAR(50)"))
+        db.session.execute(text("ALTER TABLE stored_value_txn ADD COLUMN IF NOT EXISTS reference_id VARCHAR(100)"))
+        db.session.execute(text("ALTER TABLE stored_value_txn ADD COLUMN IF NOT EXISTS operator VARCHAR(100)"))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        try:
+            engine_name = db.get_engine().name
+            if engine_name == 'sqlite':
+                info = db.session.execute(text("PRAGMA table_info(stored_value_txn)")).fetchall()
+                cols = {row[1] for row in info}
+                alters = []
+                if 'payment_method' not in cols:
+                    alters.append("ALTER TABLE stored_value_txn ADD COLUMN payment_method VARCHAR(50)")
+                if 'reference_id' not in cols:
+                    alters.append("ALTER TABLE stored_value_txn ADD COLUMN reference_id VARCHAR(100)")
+                if 'operator' not in cols:
+                    alters.append("ALTER TABLE stored_value_txn ADD COLUMN operator VARCHAR(100)")
+                for sql in alters:
+                    db.session.execute(text(sql))
+                if alters:
+                    db.session.commit()
+        except Exception:
+            db.session.rollback()
+
+    # 兼容補丁：多公司與會員欄位
+    # 建立 company 與 company_user 表（SQLite/PG 簡單兼容，PG 用 IF NOT EXISTS）
+    try:
+        db.session.execute(text("CREATE TABLE IF NOT EXISTS company (id SERIAL PRIMARY KEY, name VARCHAR(255) UNIQUE, created_at TIMESTAMP, updated_at TIMESTAMP)"))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        try:
+            engine_name = db.get_engine().name
+            if engine_name == 'sqlite':
+                db.session.execute(text("CREATE TABLE IF NOT EXISTS company (id INTEGER PRIMARY KEY AUTOINCREMENT, name VARCHAR(255) UNIQUE, created_at TIMESTAMP, updated_at TIMESTAMP)"))
+                db.session.commit()
+        except Exception:
+            db.session.rollback()
+    try:
+        db.session.execute(text("CREATE TABLE IF NOT EXISTS company_user (id SERIAL PRIMARY KEY, company_id INTEGER, user_id INTEGER, role VARCHAR(50), created_at TIMESTAMP)"))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        try:
+            engine_name = db.get_engine().name
+            if engine_name == 'sqlite':
+                db.session.execute(text("CREATE TABLE IF NOT EXISTS company_user (id INTEGER PRIMARY KEY AUTOINCREMENT, company_id INTEGER, user_id INTEGER, role VARCHAR(50), created_at TIMESTAMP)"))
+                db.session.commit()
+        except Exception:
+            db.session.rollback()
+
+    # external_user 欄位：role, company_id, expires_at
+    try:
+        db.session.execute(text("ALTER TABLE external_user ADD COLUMN IF NOT EXISTS role VARCHAR(50)"))
+        db.session.execute(text("ALTER TABLE external_user ADD COLUMN IF NOT EXISTS company_id INTEGER"))
+        db.session.execute(text("ALTER TABLE external_user ADD COLUMN IF NOT EXISTS expires_at TIMESTAMP"))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        try:
+            engine_name = db.get_engine().name
+            if engine_name == 'sqlite':
+                info = db.session.execute(text("PRAGMA table_info(external_user)")).fetchall()
+                cols = {row[1] for row in info}
+                alters = []
+                if 'role' not in cols:
+                    alters.append("ALTER TABLE external_user ADD COLUMN role VARCHAR(50)")
+                if 'company_id' not in cols:
+                    alters.append("ALTER TABLE external_user ADD COLUMN company_id INTEGER")
+                if 'expires_at' not in cols:
+                    alters.append("ALTER TABLE external_user ADD COLUMN expires_at TIMESTAMP")
+                for sql in alters:
+                    db.session.execute(text(sql))
+                if alters:
+                    db.session.commit()
+        except Exception:
+            db.session.rollback()
+
+    # feature_flag 欄位：company_id
+    try:
+        db.session.execute(text("ALTER TABLE feature_flag ADD COLUMN IF NOT EXISTS company_id INTEGER"))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        try:
+            engine_name = db.get_engine().name
+            if engine_name == 'sqlite':
+                info = db.session.execute(text("PRAGMA table_info(feature_flag)")).fetchall()
+                cols = {row[1] for row in info}
+                if 'company_id' not in cols:
+                    db.session.execute(text("ALTER TABLE feature_flag ADD COLUMN company_id INTEGER"))
+                    db.session.commit()
+        except Exception:
+            db.session.rollback()
+
+    # 預設超級管理員帳號密碼（若不存在）
+    try:
+        from models import ExternalUser
+        from werkzeug.security import generate_password_hash
+        admin = ExternalUser.query.filter_by(email='mingteagood').first()
+        if not admin:
+            admin = ExternalUser()
+            admin.email = 'mingteagood'
+            admin.password_hash = generate_password_hash('88888888')
+            admin.is_active = True
+            try:
+                admin.role = 'super_admin'
+            except Exception:
+                pass
+            db.session.add(admin)
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))

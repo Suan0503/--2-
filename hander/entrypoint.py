@@ -3,7 +3,7 @@ from extensions import handler, line_bot_api, db
 from utils.menu_helpers import reply_with_menu, notify_admins, reply_with_ad_menu
 from hander.report import handle_report, handle_report_postback
 from hander.admin import handle_admin
-from hander.verify import handle_verify
+from hander.verify import handle_verify, maybe_push_coupon_expiry_notice
 from utils.temp_users import temp_users
 from models import Whitelist, Coupon
 from utils.draw_utils import draw_coupon, has_drawn_today, save_coupon_record, get_today_coupon_flex
@@ -25,7 +25,30 @@ logging.basicConfig(level=logging.INFO)
 @handler.add(FollowEvent)
 def on_follow(event):
     logging.info(f"[FollowEvent] Source: {event.source}")
-    handle_follow(event, line_bot_api)  # 修正：傳入 line_bot_api
+    user_id = event.source.user_id
+
+    # 若此 LINE 使用者已在白名單，直接顯示驗證資訊＋主選單
+    tz = pytz.timezone("Asia/Taipei")
+    user = Whitelist.query.filter_by(line_user_id=user_id).first()
+    if user:
+        reply = (
+            f"📱 {user.phone}\n"
+            f"🌸 暱稱：{user.name or '未登記'}\n"
+            f"       個人編號：{user.id}\n"
+            f"🔗 LINE ID：{user.line_id or '未登記'}\n"
+            f"🕒 {user.created_at.astimezone(tz).strftime('%Y/%m/%d %H:%M:%S')}\n"
+            f"✅ 驗證成功，歡迎加入茗殿\n"
+            f"🌟 加入密碼：ming666"
+        )
+        reply_with_menu(event.reply_token, reply)
+        try:
+            maybe_push_coupon_expiry_notice(user_id)
+        except Exception:
+            logging.exception("maybe_push_coupon_expiry_notice in on_follow failed")
+        return
+
+    # 不在白名單：走原本的驗證導引流程
+    handle_follow(event, line_bot_api)
 
 @handler.add(MessageEvent, message=ImageMessage)
 def on_image(event):

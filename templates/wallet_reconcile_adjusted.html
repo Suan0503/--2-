@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <title>隱密沖帳總報表</title>
+  <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    body{font-family:'Zen Maru Gothic','微軟正黑體',sans-serif;background:#f7f9fb;margin:0;color:#333}
+    .header{padding:20px;text-align:center;background:#fff3e0;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+    .header a{display:inline-block;margin:6px 8px;background:#fb8c00;color:#fff;padding:8px 12px;border-radius:10px;text-decoration:none;font-size:.85rem}
+    .container{max-width:1000px;margin:24px auto;padding:0 18px}
+    .card{background:#fff;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.06);padding:16px;margin-bottom:16px}
+    .pill{background:#fff3e0;color:#e65100;border-radius:999px;padding:6px 10px;font-size:.85rem;display:inline-block;margin:4px 6px}
+    input,select{padding:8px 10px;border:1px solid #cfd8dc;border-radius:8px}
+    button{background:#fb8c00;border:none;color:#fff;border-radius:8px;padding:8px 12px;cursor:pointer}
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h2>🧾 隱密沖帳總報表</h2>
+    <a href="/admin/wallet/reconcile">儲值對帳</a>
+    <a href="/admin/wallet/reconcile/consume">扣款對帳</a>
+    <a href="/admin/home">回後台主頁</a>
+  </div>
+  <div class="container">
+    <div class="card">
+      <div class="pill">查詢區間：{{ start_local_display }} ~ {{ end_local_display }}</div>
+      <form method="get" action="/admin/wallet/reconcile/adjusted" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px">
+        <label>快速區間</label>
+        <select name="preset" onchange="this.form.submit()">
+          <option value="">自訂</option>
+          <option value="today" {% if preset=='today' %}selected{% endif %}>今日</option>
+          <option value="yesterday" {% if preset=='yesterday' %}selected{% endif %}>昨日</option>
+          <option value="thisweek" {% if preset=='thisweek' %}selected{% endif %}>本週</option>
+          <option value="thismonth" {% if preset=='thismonth' %}selected{% endif %}>本月</option>
+          <option value="lastmonth" {% if preset=='lastmonth' %}selected{% endif %}>上個月</option>
+        </select>
+        <label>起</label>
+        <input type="date" name="start" value="{{ start or '' }}" />
+        <label>迄</label>
+        <input type="date" name="end" value="{{ end or '' }}" />
+        <label>總額沖正(±)</label>
+        <input type="number" name="total_offset" value="{{ total_offset or 0 }}" style="width:140px" />
+        <label>支出沖正(±)</label>
+        <input type="number" name="consume_offset" value="{{ consume_offset or 0 }}" style="width:140px" />
+        <button type="submit">套用</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0">調整後摘要</h3>
+      <div class="pill">原始總額：{{ topup_total }}</div>
+      <div class="pill">原始支出：{{ consume_total }}</div>
+      <div class="pill" title="沖正後顯示的總額">顯示總額：<b>{{ adj_total }}</b></div>
+      <div class="pill" title="沖正後顯示的支出">顯示支出：<b>{{ adj_consume }}</b></div>
+      <div class="pill" title="顯示總額減顯示支出">顯示剩餘：<b>{{ adj_remaining }}</b></div>
+    </div>
+  </div>
+</body>
+</html>

@@ -291,7 +291,7 @@ def handle_follow(event):
             pass
         display_name = profile_name or "用戶"
         set_temp_user(user_id, {"step": "waiting_phone", "name": display_name, "nickname": display_name, "user_id": user_id, "line_user_id": user_id})
-        reply_basic(event, "歡迎加入～請直接輸入手機號碼（09開頭）進行驗證。")
+        reply_basic(event, "歡迎加入～現在請直接輸入手機號碼（09開頭，共10碼），不要加其它文字。")
     except Exception:
         logging.exception("handle_follow failed")
 
@@ -637,7 +637,10 @@ def handle_text(event):
             reply_basic(event, "❌ 此手機已綁定其他帳號，請聯絡客服協助。")
             return
         set_temp_user(user_id, {"step": "waiting_lineid", "name": display_name, "phone": phone_candidate, "user_id": user_id})
-        reply_basic(event, "✅ 手機號已登記～請輸入您的 LINE ID（未設定請輸入：尚未設定）")
+        reply_basic(event,
+            "✅ 手機號已登記～請輸入您的 LINE ID（未設定請輸入：尚未設定）\n"
+            "⚠️ 若沒有設定 ID，請『只輸入四個字：尚未設定』，不要加其它文字或符號。"
+        )
         return
 
     if re.match(r"^\d{8}$", user_text):
@@ -694,7 +697,10 @@ def handle_text(event):
         tu["step"] = "waiting_lineid"
         tu["user_id"] = user_id
         set_temp_user(user_id, tu)
-        reply_basic(event, "✅ 手機號已登記～請輸入您的 LINE ID（未設定請輸入：尚未設定）")
+        reply_basic(event,
+            "✅ 手機號已登記～請輸入您的 LINE ID（未設定請輸入：尚未設定）\n"
+            "⚠️ 若沒有設定 ID，請『只輸入四個字：尚未設定』，不要加其它文字或符號。"
+        )
         return
 
     tu = get_temp_user(user_id)
@@ -716,8 +722,8 @@ def handle_text(event):
         reply_basic(
             event,
             "📸 請上傳您的 LINE 個人頁面截圖\n"
-            "👉 路徑：LINE主頁 > 右上角設定 > 個人檔案 > 點進去後截圖\n"
-            "需清楚顯示 LINE 名稱與（若有）ID，作為驗證依據\n\n"
+            "👉 路徑：LINE主頁 > 右上角『設定』 > 『個人檔案』，點進去後截圖\n"
+            "畫面需清楚看到：您的 LINE 名稱，以及名稱下方那一行（顯示 ID 或『未設定』的那一行）。\n\n"
             "範例："
         )
         try:

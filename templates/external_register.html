@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MN System 註冊</title>
+  <style>
+    :root{--primary:#1e88e5;--bg:#f7f9fc;--text:#2c3e50;--muted:#607d8b;--card:#fff;--border:#e0e6ef}
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Noto Sans,Tahoma}
+    header{position:fixed;top:0;left:0;right:0;height:56px;background:var(--card);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 16px;z-index:10}
+    header .brand{display:flex;align-items:center;gap:10px}
+    header .brand img{width:28px;height:28px}
+    header .actions a{color:var(--primary);text-decoration:none;margin-left:12px}
+    main{display:flex;margin-top:56px}
+    nav{width:240px;background:var(--card);border-right:1px solid var(--border);min-height:calc(100vh - 56px);position:sticky;top:56px}
+    nav .section{padding:12px;border-bottom:1px solid var(--border)}
+    nav a{display:block;padding:10px 12px;margin:6px 8px;border-radius:8px;color:var(--text);text-decoration:none}
+    nav a:hover{background:#f5f7fb}
+    .content{flex:1;padding:18px}
+    .card{max-width:420px;margin:20px auto;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;box-shadow:0 4px 16px rgba(0,0,0,.04)}
+    input{width:100%;padding:10px;margin:8px 0;border:1px solid var(--border);border-radius:8px;background:#fff}
+    button{width:100%;padding:10px;background:#388e3c;color:#fff;border:none;border-radius:8px}
+    @media(max-width:768px){nav{display:none}}
+  </style>
+  </head>
+  <body>
+    <header>
+      <div class="brand">
+        <img src="/static/magicbook.png" alt="logo" />
+        <strong>MN System</strong>
+      </div>
+      <div class="actions">
+        <a href="/">主頁</a>
+        <a href="/login">登入</a>
+      </div>
+    </header>
+    <main>
+      <nav>
+        <div class="section"><strong>導覽</strong></div>
+        <a href="/admin/home">管理首頁</a>
+        <a href="/admin/dashboard">Dashboard</a>
+        <a href="/admin/wallet">錢包</a>
+        <a href="/admin/wallet/reconcile">儲值對帳</a>
+      </nav>
+      <div class="content">
+        <div class="card">
+          <h2 style="margin:0 0 8px">註冊</h2>
+          <form method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+            <label>Email</label>
+            <input type="email" name="email" required />
+            <label>密碼</label>
+            <input type="password" name="password" required />
+            <button type="submit">註冊</button>
+          </form>
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

@@ -79,6 +79,7 @@
       <div class="container">
         <div class="row justify-content-center">
           <div class="col-md-10">
+            {% block header_card %}
             <div class="card p-4 mb-4">
               <h2 class="mb-3 font-weight-bold text-center" style="color:#2d3a4b;"><i class="fa fa-cogs"></i> 歡迎使用後台管理系統</h2>
               <p class="lead mb-4 text-center" style="color:#555;">快速管理白名單、黑名單、抽獎券與即時班表。<br>所有操作都將記錄於系統，請謹慎使用！</p>
@@ -103,6 +104,7 @@
                 </div>
               </div>
             </div>
+            {% endblock %}
             {% with messages = get_flashed_messages(with_categories=true) %}
               {% if messages %}
                 <div class="mt-3">

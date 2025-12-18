@@ -4,7 +4,7 @@ from extensions import line_bot_api
 from storage import ADMIN_IDS  # 管理員清單
 from secrets import choice as secrets_choice
 
-# ================= 聖誕主題配色 =================
+# ================= 聖誕/冬季主題配色 =================
 XMAS_BG_1   = "#0B3D2E"  # 深綠
 XMAS_BG_2   = "#072A20"  # 更深綠
 XMAS_GOLD   = "#FFD700"  # 金色
@@ -14,6 +14,15 @@ XMAS_GREEN  = "#2E7D32"  # 松樹綠
 XMAS_ACCENT = "#00897B"  # 冬日青綠
 XMAS_PURPLE = "#6A1B9A"  # 點綴紫
 XMAS_BORDER = "#1B5E20"  # 深綠分隔線
+
+# 冬至主選單專用配色（不影響廣告泡泡）
+WINTER_BG_1   = "#001826"  # 深夜藍綠
+WINTER_BG_2   = "#021018"  # 更深夜空
+WINTER_GOLD   = "#F2C94C"  # 暖黃燈光
+WINTER_SNOW   = "#F9FAFB"  # 雪白
+WINTER_BLUE   = "#0F4C75"  # 冬季藍
+WINTER_ACCENT = "#56CCF2"  # 冰藍點綴
+WINTER_PURPLE = "#6A1B9A"  # 夜色紫
 
 # ====== 共用：隨機客服/預約群連結 ======
 def choose_link():
@@ -93,11 +102,12 @@ def get_ad_menu():
 
 # ====== 聖誕主選單（兩頁 Carousel） ======
 def get_menu_carousel():
-    COLOR_PRIMARY = XMAS_RED
-    COLOR_ACCENT = XMAS_GREEN
-    COLOR_SECONDARY = XMAS_ACCENT
-    COLOR_GRAY = XMAS_SNOW
-    COLOR_ALERT = XMAS_PURPLE
+    # 冬至主選單配色
+    COLOR_PRIMARY = WINTER_BLUE
+    COLOR_ACCENT = WINTER_ACCENT
+    COLOR_SECONDARY = WINTER_GOLD
+    COLOR_GRAY = WINTER_SNOW
+    COLOR_ALERT = WINTER_PURPLE
 
     page1 = {
         "type": "bubble",
@@ -105,24 +115,24 @@ def get_menu_carousel():
         "header": {
             "type": "box",
             "layout": "vertical",
-            "backgroundColor": XMAS_BG_1,
+            "backgroundColor": WINTER_BG_1,
             "paddingAll": "16px",
             "contents": [{
                 "type": "text",
-                "text": "🎄 茗殿選單 1/2",
+                "text": "❄️ 冬至暖心選單 1/2",
                 "weight": "bold",
                 "align": "center",
                 "size": "lg",
-                "color": XMAS_GOLD
+                "color": WINTER_GOLD
             }]
         },
         "body": {
             "type": "box",
             "layout": "vertical",
-            "backgroundColor": XMAS_BG_1,
+            "backgroundColor": WINTER_BG_1,
             "spacing": "md",
             "contents": [
-                {"type": "separator", "color": XMAS_BORDER},
+                {"type": "separator", "color": WINTER_BLUE},
                 {
                     "type": "box",
                     "layout": "vertical",
@@ -146,24 +156,24 @@ def get_menu_carousel():
         "header": {
             "type": "box",
             "layout": "vertical",
-            "backgroundColor": XMAS_BG_2,
+            "backgroundColor": WINTER_BG_2,
             "paddingAll": "16px",
             "contents": [{
                 "type": "text",
-                "text": "🎄 茗殿選單 2/2",
+                "text": "❄️ 冬至暖心選單 2/2",
                 "weight": "bold",
                 "align": "center",
                 "size": "lg",
-                "color": XMAS_GOLD
+                "color": WINTER_GOLD
             }]
         },
         "body": {
             "type": "box",
             "layout": "vertical",
-            "backgroundColor": XMAS_BG_2,
+            "backgroundColor": WINTER_BG_2,
             "spacing": "md",
             "contents": [
-                {"type": "separator", "color": XMAS_BORDER},
+                {"type": "separator", "color": WINTER_BLUE},
                 {
                     "type": "box",
                     "layout": "vertical",
@@ -182,7 +192,7 @@ def get_menu_carousel():
     }
 
     return FlexSendMessage(
-        alt_text="聖誕節主選單",
+        alt_text="冬至主選單",
         contents={"type": "carousel", "contents": [page1, page2]}
     )
 

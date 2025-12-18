@@ -1,0 +1,78 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>客人管理介面</title>
+  <style>
+    body{font-family:sans-serif;margin:0;background:#fafafa}
+    header{background:#222;color:#fff;padding:12px 16px}
+    .wrap{max-width:1100px;margin:20px auto;padding:0 16px}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+    .card{background:#fff;border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.06);padding:16px}
+    a.button{display:inline-block;margin-top:8px;padding:8px 12px;background:#1976d2;color:#fff;text-decoration:none;border-radius:8px}
+    small{color:#666}
+  </style>
+</head>
+<body>
+  <header>
+    <strong>客人管理介面</strong>
+    <span style="float:right"><a href="{{ url_for('external.features') }}" style="color:#fff">返回功能頁</a></span>
+  </header>
+  <div class="wrap">
+    <div class="grid">
+      <div class="card">
+        <h3>管理首頁</h3>
+        <p>近期白/黑名單與待驗證摘要。</p>
+        <a class="button" href="/MT_System/admin/home">開啟</a>
+      </div>
+      <div class="card">
+        <h3>白名單</h3>
+        <p>搜尋/維護白名單。</p>
+        <a class="button" href="/MT_System/admin/whitelist?active_tab=whitelist">開啟</a>
+      </div>
+      <div class="card">
+        <h3>黑名單</h3>
+        <p>搜尋/維護黑名單。</p>
+        <a class="button" href="/MT_System/admin/blacklist?active_tab=blacklist">開啟</a>
+      </div>
+      <div class="card">
+        <h3>待驗證</h3>
+        <p>人工通關或刪除暫存名單。</p>
+        <a class="button" href="/MT_System/admin/pending?active_tab=pending">開啟</a>
+      </div>
+      <div class="card">
+        <h3>錢包</h3>
+        <p>查詢儲值、扣款、折價券。</p>
+        <a class="button" href="/MT_System/admin/wallet">開啟</a>
+      </div>
+      <div class="card">
+        <h3>錢包總表</h3>
+        <p>所有錢包摘要與搜尋。</p>
+        <a class="button" href="/MT_System/admin/wallet/summary">開啟</a>
+      </div>
+      <div class="card">
+        <h3>儲值對帳</h3>
+        <p>12:00–次日03:00 會計窗，區間查詢與匯出。</p>
+        <a class="button" href="/MT_System/admin/wallet/reconcile?preset=today">今日</a>
+        <a class="button" href="/MT_System/admin/wallet/reconcile">自訂</a>
+      </div>
+      <div class="card">
+        <h3>扣款對帳</h3>
+        <p>區間與過濾條件，券值加總與調整顯示。</p>
+        <a class="button" href="/MT_System/admin/wallet/reconcile_consume?preset=today">今日</a>
+        <a class="button" href="/MT_System/admin/wallet/reconcile_consume">自訂</a>
+      </div>
+      <div class="card">
+        <h3>隱密沖帳總報表</h3>
+        <p>僅影響顯示的沖正總覽。</p>
+        <a class="button" href="/MT_System/admin/wallet/reconcile_adjusted">開啟</a>
+      </div>
+      <div class="card">
+        <h3>排程</h3>
+        <p>日程工具與提醒設定。</p>
+        <a class="button" href="/MT_System/admin/schedule">開啟</a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

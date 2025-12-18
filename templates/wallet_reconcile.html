@@ -35,12 +35,17 @@
         <div class="pill">本日時段總額(12:00~翌日03:00)：<b>{{ today_total }}</b></div>
         <div class="pill muted">查詢區間：{{ start_local_display }} ~ {{ end_local_display }}</div>
         <div class="pill">筆數：<b>{{ count }}</b></div>
-        <div class="pill">總額：<b>{{ total_amount }}</b></div>
-        <div class="pill">平均：<b>{{ avg_amount }}</b></div>
+  <div class="pill">總額：<b>{{ total_amount }}</b></div>
+  <div class="pill" title="調整後顯示總額（僅影響此頁顯示，不改資料）">顯示總額：<b>{{ adj_total_amount }}</b></div>
+  <div class="pill">平均：<b>{{ avg_amount }}</b></div>
+  <div class="pill" title="調整後顯示平均">顯示平均：<b>{{ adj_avg_amount }}</b></div>
         <div class="pill" title="依備註關鍵字（例如 TOPUP_CASH, 現金）判斷">現金應收：<b>{{ cash_total }}</b>（{{ cash_count }} 筆）</div>
   <div class="pill" title="本查詢期間會員扣款總額">支出：<b>{{ consume_total }}</b>（{{ consume_count }} 筆）</div>
+  <div class="pill" title="顯示總額扣除支出後">顯示剩餘：<b>{{ adj_remaining }}</b></div>
+  <div class="pill" title="資料庫交易筆數">TXN總數：{{ txn_count }}</div>
+  <div class="pill" title="最大交易ID">最大ID：{{ last_txn_id }}</div>
       </div>
-      <form method="get" action="/admin/wallet/reconcile" style="display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap">
+  <form method="get" action="/admin/wallet/reconcile" style="display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap">
         <label>快速區間</label>
         <select name="preset" onchange="this.form.submit()">
           <option value="">自訂</option>
@@ -48,6 +53,7 @@
           <option value="yesterday" {% if preset=='yesterday' %}selected{% endif %}>昨日</option>
           <option value="thisweek" {% if preset=='thisweek' %}selected{% endif %}>本週</option>
           <option value="thismonth" {% if preset=='thismonth' %}selected{% endif %}>本月</option>
+          <option value="lastmonth" {% if preset=='lastmonth' %}selected{% endif %}>上個月</option>
         </select>
         <label>起</label>
         <input type="date" name="start" value="{{ start or '' }}" />
@@ -55,10 +61,27 @@
         <input type="date" name="end" value="{{ end or '' }}" />
         <label>現金關鍵字</label>
         <input type="text" name="cash_kw" value="{{ cash_kw or '' }}" placeholder="TOPUP_CASH,現金" />
-  <label>備註關鍵字</label>
-  <input type="text" name="remark_kw" value="{{ remark_kw or '' }}" placeholder="輸入備註過濾" />
-        <button type="submit">查詢</button>
-        <a class="button" href="/admin/wallet/reconcile?start={{ start or '' }}&end={{ end or '' }}&cash_kw={{ cash_kw or '' }}&export=csv" style="text-decoration:none"><button type="button">匯出 CSV</button></a>
+        <label>付款方式</label>
+        <select name="payment_method">
+          <option value="" {% if not payment_method_filter %}selected{% endif %}>全部</option>
+          <option value="CASH" {% if payment_method_filter=='CASH' %}selected{% endif %}>現金</option>
+          <option value="BANK" {% if payment_method_filter=='BANK' %}selected{% endif %}>匯款</option>
+          <option value="CARD" {% if payment_method_filter=='CARD' %}selected{% endif %}>刷卡</option>
+          <option value="TWQR" {% if payment_method_filter=='TWQR' %}selected{% endif %}>台灣Pay/掃碼</option>
+          <option value="OTHER" {% if payment_method_filter=='OTHER' %}selected{% endif %}>其他</option>
+        </select>
+        <label>單號關鍵字</label>
+        <input type="text" name="reference_kw" value="{{ reference_kw or '' }}" placeholder="單號搜尋" />
+        <label>備註/整體關鍵字</label>
+        <input type="text" name="remark_kw" value="{{ remark_kw or '' }}" placeholder="備註或付款方式或單號" />
+  <button type="submit">查詢</button>
+  <label>顯示沖正(±)</label>
+  <input type="number" name="offset" value="{{ request.args.get('offset') or 0 }}" style="width:120px" />
+  <button type="submit">套用顯示沖正</button>
+  <a class="button" href="/admin/wallet/reconcile?start={{ start or '' }}&end={{ end or '' }}&cash_kw={{ cash_kw or '' }}&remark_kw={{ remark_kw or '' }}&export=csv" style="text-decoration:none"><button type="button">當前篩選CSV</button></a>
+  <a class="button" href="/admin/wallet/transactions/export?fmt=csv&type=topup&start={{ start or '' }}&end={{ end or '' }}" style="text-decoration:none"><button type="button">全部儲值CSV</button></a>
+  <a class="button" href="/admin/wallet/transactions/export?fmt=csv&type=consume&start={{ start or '' }}&end={{ end or '' }}" style="text-decoration:none"><button type="button">全部扣款CSV</button></a>
+  <a class="button" href="/admin/wallet/transactions/export?fmt=json&type=all&start={{ start or '' }}&end={{ end or '' }}" style="text-decoration:none"><button type="button">全部JSON</button></a>
       </form>
     </div>
 
@@ -73,13 +96,16 @@
             <th>名稱</th>
             <th>編號</th>
             <th>金額</th>
+            <th>付款方式</th>
+            <th>單號</th>
+            <th>經手人</th>
             <th>備註</th>
           </tr>
         </thead>
         <tbody>
           {% for r in rows %}
           <tr>
-            <td>{{ r.id }}</td>
+                <td><a href="/admin/wallet/txn/{{ r.id }}" style="color:#1976d2;text-decoration:none" title="查看原始資料">{{ r.id }}</a></td>
             <td>{{ r.time }}</td>
             <td>
               {% if r.phone and r.phone != '—' %}
@@ -91,6 +117,9 @@
             <td>{{ r.nickname }}</td>
             <td>{{ r.code }}</td>
             <td>{{ r.amount }}</td>
+            <td>{{ r.payment_method or '—' }}</td>
+            <td>{{ r.reference_id or '—' }}</td>
+            <td>{{ r.operator or '—' }}</td>
             <td>{{ r.remark }}</td>
           </tr>
           {% endfor %}
@@ -110,7 +139,7 @@
             <tbody>
               {% for r in invalid_rows %}
               <tr>
-                <td>{{ r.id }}</td>
+                <td><a href="/admin/wallet/txn/{{ r.id }}" style="color:#1976d2;text-decoration:none">{{ r.id }}</a></td>
                 <td>{{ r.time }}</td>
                 <td>{{ r.amount }}</td>
                 <td>{{ r.remark }}</td>
@@ -136,7 +165,7 @@
             <tbody>
               {% for r in duplicate_rows %}
               <tr>
-                <td>{{ r.id }}</td>
+                <td><a href="/admin/wallet/txn/{{ r.id }}" style="color:#1976d2;text-decoration:none">{{ r.id }}</a></td>
                 <td>{{ r.phone }}</td>
                 <td>{{ r.time }}</td>
                 <td>{{ r.amount }}</td>

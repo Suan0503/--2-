@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <title>妹妹薪水對帳工具</title>
+  <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    body{font-family:'Zen Maru Gothic','微軟正黑體',sans-serif;background:#f7f9fb;margin:0;color:#333}
+    .header{padding:16px 20px;text-align:center;background:#e3f2fd;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+    .header h2{margin:0;font-size:1.4rem}
+    .header-links{margin-top:8px}
+    .header-links a{display:inline-block;margin:4px 6px;background:#2196f3;color:#fff;padding:6px 10px;border-radius:999px;text-decoration:none;font-size:.8rem}
+    .container{max-width:1100px;margin:20px auto 32px;padding:0 18px}
+    .card{background:#fff;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.06);padding:18px 18px 20px;margin-bottom:18px}
+    .card h3{margin:0 0 10px;font-size:1.1rem}
+    .form-grid{display:grid;grid-template-columns:1.1fr 1.6fr;gap:16px}
+    @media(max-width:840px){.form-grid{grid-template-columns:1fr}}
+    textarea{width:100%;min-height:80px;font-family:inherit;font-size:.85rem;padding:8px 10px;border-radius:8px;border:1px solid #cfd8dc;resize:vertical}
+    label{font-size:.85rem;font-weight:600;color:#455a64;display:block;margin-bottom:4px}
+    .hint{font-size:.75rem;color:#78909c;margin-top:4px;line-height:1.5}
+    .actions{margin-top:10px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+    .btn{background:#1976d2;border:none;color:#fff;border-radius:8px;padding:8px 16px;font-size:.9rem;cursor:pointer}
+    .checkbox{font-size:.85rem;color:#455a64;display:flex;align-items:center;gap:6px}
+    .summary-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px}
+    .pill{background:#e3f2fd;color:#0d47a1;border-radius:999px;padding:6px 12px;font-size:.85rem}
+    .pill strong{font-weight:700}
+    .errors{margin:6px 0 0;padding:8px 10px;border-radius:8px;background:#ffebee;color:#c62828;font-size:.8rem}
+    table{width:100%;border-collapse:collapse;font-size:.82rem;margin-top:8px}
+    th,td{border-bottom:1px solid #e0e0e0;padding:6px 8px;text-align:left}
+    thead tr{background:#eceff1}
+    tr:nth-child(even){background:#fafafa}
+    tr:hover{background:#f1f5f9}
+    .note{font-size:.75rem;color:#ef6c00}
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h2>📒 妹妹薪水對帳工具</h2>
+    <div class="header-links">
+      <a href="/admin/home">回後台主頁</a>
+      <a href="/admin/wallet">儲值金專區</a>
+      <a href="/admin/wallet/reconcile">儲值對帳</a>
+    </div>
+  </div>
+
+  <div class="container">
+    <form method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+      <input type="hidden" name="salary_config" value="{{ salary_config_text }}" />
+
+      <div class="card">
+        <h3>妹妹薪資設定</h3>
+        <div class="form-grid">
+          <div>
+            <label>新增妹妹</label>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px">
+              <input type="text" name="new_name" placeholder="妹妹名稱" style="flex:1 1 80px" />
+              <input type="number" name="salary_90" placeholder="90分薪水" style="width:110px" />
+              <input type="number" name="salary_60" placeholder="60分薪水" style="width:110px" />
+              <input type="number" name="salary_40" placeholder="40分薪水" style="width:110px" />
+              <button type="submit" name="action" value="add_config" class="btn">新增</button>
+            </div>
+            <div class="hint">
+              例：多多 90 分 2400、60 分 1400、40 分 1100，就依序填入三個金額後按「新增」。
+            </div>
+          </div>
+          <div>
+            <label>已設定的妹妹（點選要計算的對象）</label>
+            <div style="display:flex;flex-wrap:wrap;gap:8px">
+              {% for g in salary_list %}
+                <label class="checkbox" style="background:#e3f2fd;border-radius:999px;padding:4px 10px;cursor:pointer">
+                  <input type="radio" name="selected_name" value="{{ g.name }}" {% if selected_name==g.name %}checked{% endif %} />
+                  {{ g.name }}
+                  <span class="hint" style="margin-left:4px">(40:{{ g.s40 or '-' }} / 60:{{ g.s60 or '-' }} / 90:{{ g.s90 or '-' }})</span>
+                </label>
+              {% else %}
+                <div class="hint">尚未新增任何妹妹，請先在左側輸入一位妹妹的薪資再按「新增」。</div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>計算區</h3>
+        <div class="form-grid">
+          <div>
+            <label>當日紀錄貼上（目前計算：{% if selected_name %}{{ selected_name }}{% else %}尚未選擇妹妹{% endif %}）</label>
+            <textarea name="records" rows="10" placeholder="例如：&#10;12/16&#10;13:00茗2000/60/1(儲值扣&#10;15:00多2300/60/1&#10;...">{{ records_text }}</textarea>
+            <div class="hint">
+              貼上你整天的紀錄即可，日期行（如：12/16）會自動忽略。<br>
+              每筆格式：時間+姓名+金額/分鐘數/人數，例如：15:00多2300/60/1。<br>
+              系統會依「目前選取的妹妹」的 40/60/90 分薪水標準，對所有紀錄行計算妹妹薪水，行內的名字只當備註用。<br>
+              含「儲值扣」文字的行，會在明細備註中標記方便你人工檢查。
+            </div>
+          </div>
+          <div>
+            <label>其他設定</label>
+            <div class="actions" style="margin-top:0">
+              <label class="checkbox">
+                <input type="checkbox" name="include_meal" value="1" {% if include_meal %}checked{% endif %} />
+                飯錢 200 元（有飯錢就勾選）
+              </label>
+            </div>
+            <div class="actions" style="margin-top:10px">
+              <button type="submit" name="action" value="calculate" class="btn">計算目前選取的妹妹</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </form>
+
+    {% if errors %}
+    <div class="card">
+      <h3>注意事項</h3>
+      <div class="errors">
+        {% for e in errors %}
+          <div>・{{ e }}</div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if result %}
+    <div class="card">
+      <h3>輸出區</h3>
+      <div class="hint" style="margin-bottom:6px">以下會先列出你貼上的原始紀錄，接著顯示今天的加總公式與總收：</div>
+      <pre style="background:#f5f5f5;border-radius:8px;padding:10px;font-size:.8rem;white-space:pre-wrap;overflow-x:auto">{{ records_text }}</pre>
+      <div style="margin-top:10px;font-size:.85rem;line-height:1.6">
+        {% if summary_revenue_expr %}
+          <div>{{ summary_revenue_expr }}</div>
+        {% endif %}
+        {% if summary_salary_expr %}
+          <div style="white-space:pre-line">{{ summary_salary_expr }}</div>
+        {% endif %}
+        {% if summary_meal is not none %}
+          <div>{{ summary_meal }}</div>
+        {% endif %}
+        {% if summary_net_expr %}
+          <div style="margin-top:6px">{{ summary_net_expr }}</div>
+          <div>總收({{ result.net }})</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>對帳結果</h3>
+      <div class="summary-row">
+        <div class="pill">今日總收（全部）：<strong>{{ result.total_revenue }}</strong></div>
+        <div class="pill">{% if selected_name %}{{ selected_name }}{% else %}妹妹{% endif %} 薪水合計：<strong>{{ result.total_salary }}</strong></div>
+        <div class="pill">飯錢：<strong>{{ result.meal_fee }}</strong></div>
+        <div class="pill">總收（今日總收 − 妹妹薪水 − 飯錢）：<strong>{{ result.net }}</strong></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>明細檢查</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>原始文字</th>
+            <th>時間</th>
+            <th>妹妹</th>
+            <th>金額</th>
+            <th>分鐘數</th>
+            <th>人數</th>
+            <th>計入總收</th>
+            <th>此筆薪水</th>
+            <th>備註</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in entries %}
+          <tr>
+            <td>{{ r.raw }}</td>
+            <td>{{ r.time }}</td>
+            <td>{{ r.name }}</td>
+            <td>{{ r.amount }}</td>
+            <td>{{ r.length }}</td>
+            <td>{{ r.count }}</td>
+            <td>{{ r.revenue }}</td>
+            <td>{{ r.salary }}</td>
+            <td class="note">{{ r.note }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </div>
+</body>
+</html>

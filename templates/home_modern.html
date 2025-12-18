@@ -1,0 +1,27 @@
+{% extends 'base_modern.html' %}
+{% block title %}MN System 平台{% endblock %}
+{% block content %}
+  <div class="toolbar" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+    <a href="/admin/home" style="padding:8px 12px;border:1px solid #e0e6ef;border-radius:8px;background:#fff;color:#2c3e50;text-decoration:none">管理首頁</a>
+    <a href="/admin/wallet" style="padding:8px 12px;border:1px solid #e0e6ef;border-radius:8px;background:#fff;color:#2c3e50;text-decoration:none">錢包</a>
+    <a href="/admin/wallet/reconcile" style="padding:8px 12px;border:1px solid #e0e6ef;border-radius:8px;background:#fff;color:#2c3e50;text-decoration:none">今日對帳</a>
+    <a href="/MT_System/admin/embed" style="padding:8px 12px;border:1px solid #e0e6ef;border-radius:8px;background:#fff;color:#2c3e50;text-decoration:none">嵌入管理</a>
+  </div>
+  <div class="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px">
+    <div class="card" style="background:#fff;border:1px solid #e0e6ef;border-radius:12px;padding:16px;box-shadow:0 4px 16px rgba(0,0,0,.04)">
+      <h3 style="margin:0 0 8px">公告</h3>
+      <p>這裡可放置系統公告與版本更新。</p>
+    </div>
+    <div class="card" style="background:#fff;border:1px solid #e0e6ef;border-radius:12px;padding:16px;box-shadow:0 4px 16px rgba(0,0,0,.04)">
+      <h3 style="margin:0 0 8px">快速入口</h3>
+      <p>透過上方工具列或左側導覽，進入常用功能。</p>
+    </div>
+    <div class="card" style="background:#fff;border:1px solid #e0e6ef;border-radius:12px;padding:16px;box-shadow:0 4px 16px rgba(0,0,0,.04)">
+      <h3 style="margin:0 0 8px">狀態</h3>
+      <p>DB 與 LINE 狀態可在 /home 與 /line_status 檢視。</p>
+    </div>
+  </div>
+  <footer style="padding:16px;color:#607d8b;text-align:center">
+    © {{ (now().year if now else 2025) }} MN System. All rights reserved.
+  </footer>
+{% endblock %}

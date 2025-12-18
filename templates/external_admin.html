@@ -1,0 +1,60 @@
+<!doctype html>
+<html>
+<head>
+  <title>超級管理員</title>
+</head>
+<body>
+  <h1>超級管理員儀表板</h1>
+  <p><a href="{{ url_for('external.features') }}">返回功能頁</a></p>
+
+  <h2>公司管理</h2>
+  <form method="post" action="{{ url_for('external.admin_company_create') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+    <label>公司名稱：<input type="text" name="name" /></label>
+    <button type="submit">建立公司</button>
+  </form>
+  <ul>
+    {% for c in companies %}
+      <li>{{ c.name }}</li>
+    {% endfor %}
+  </ul>
+
+  <h2>使用者管理</h2>
+  <table>
+    <thead><tr><th>Email</th><th>角色</th><th>公司</th><th>操作</th></tr></thead>
+    <tbody>
+    {% for u in users %}
+      <tr>
+        <td>{{ u.email }}</td>
+        <td>{{ u.role or 'user' }}</td>
+        <td>{{ u.company_id or '—' }}</td>
+        <td>
+          <form method="post" action="{{ url_for('external.admin_user_role') }}" style="display:inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+            <input type="hidden" name="user_id" value="{{ u.id }}" />
+            <select name="role">
+              <option value="user">user</option>
+              <option value="operator">operator</option>
+              <option value="paid_admin">paid_admin</option>
+              <option value="super_admin">super_admin</option>
+            </select>
+            <button type="submit">設角色</button>
+          </form>
+          <form method="post" action="{{ url_for('external.admin_user_company') }}" style="display:inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+            <input type="hidden" name="user_id" value="{{ u.id }}" />
+            <select name="company_id">
+              <option value="">(無)</option>
+              {% for c in companies %}
+                <option value="{{ c.id }}">{{ c.name }}</option>
+              {% endfor %}
+            </select>
+            <button type="submit">設公司</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>

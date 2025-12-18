@@ -31,20 +31,36 @@
       <div>
         <span class="pill">查詢區間：{{ start_local_display }} ~ {{ end_local_display }}</span>
         <span class="pill">使用儲值金：{{ stored_sum }} 元（{{ stored_count }} 筆）</span>
-        <span class="pill" title="金額為 0 且使用折價券">使用折價券：{{ coupon_only_count }} 筆</span>
+        <span class="pill" title="檯面下沖正後顯示的使用儲值金">顯示儲值金：{{ adj_stored_sum }} 元</span>
+  <span class="pill" title="金額為 0 且使用折價券">使用折價券：{{ coupon_only_count }} 筆</span>
+  <span class="pill" title="本區間折價券金額合計（500/300/100）">折價券金額：{{ coupon_value_total }} 元</span>
       </div>
       <form method="get" action="/admin/wallet/reconcile/consume" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px">
         <label>快速區間</label>
-        <select name="preset" onchange="this.form.submit()">
+  <select name="preset" onchange="this.form.submit()">
           <option value="">自訂</option>
           <option value="today" {% if preset=='today' %}selected{% endif %}>今日</option>
           <option value="yesterday" {% if preset=='yesterday' %}selected{% endif %}>昨日</option>
           <option value="thisweek" {% if preset=='thisweek' %}selected{% endif %}>本週</option>
           <option value="thismonth" {% if preset=='thismonth' %}selected{% endif %}>本月</option>
+          <option value="lastmonth" {% if preset=='lastmonth' %}selected{% endif %}>上月</option>
+        </select>
+  <label>起</label>
+  <input type="date" name="start" value="{{ start or '' }}" />
+  <label>迄</label>
+  <input type="date" name="end" value="{{ end or '' }}" />
+        <label>只看</label>
+        <select name="only">
+          <option value="" {% if not only %}selected{% endif %}>全部</option>
+          <option value="stored" {% if only=='stored' %}selected{% endif %}>使用儲值金</option>
+          <option value="coupon" {% if only=='coupon' %}selected{% endif %}>單純折價券</option>
         </select>
         <label>備註關鍵字</label>
         <input type="text" name="remark_kw" value="{{ remark_kw or '' }}" placeholder="輸入關鍵字" />
-        <button type="submit">查詢</button>
+  <button type="submit">查詢</button>
+  <label>顯示沖正(±)</label>
+  <input type="number" name="offset" value="{{ offset or 0 }}" style="width:120px" />
+  <button type="submit">套用顯示沖正</button>
       </form>
     </div>
 

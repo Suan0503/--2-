@@ -4,27 +4,228 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>儲值金專區</title>
-  <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
-    body{font-family:'Zen Maru Gothic','微軟正黑體',sans-serif;background:#f9f7f5;margin:0;color:#444}
-    .header{padding:20px;text-align:center;background:#e8eaf6;box-shadow:0 2px 8px rgba(0,0,0,.06)}
-    .header a{display:inline-block;margin:6px 8px;background:#7e57c2;color:#fff;padding:8px 12px;border-radius:10px;text-decoration:none}
-    .container{max-width:1100px;margin:20px auto;padding:0 16px}
-    .card{background:#fff;border-radius:16px;box-shadow:0 4px 14px rgba(0,0,0,.08);padding:18px;margin-bottom:18px}
-    .row{display:flex;gap:20px;flex-wrap:wrap}
-    .col{flex:1 1 320px}
-    table{width:100%;border-collapse:collapse}
-    th,td{border-bottom:1px solid #eee;padding:8px 10px;text-align:left;font-size:.9rem}
-    thead tr{background:#ede7f6;color:#673ab7}
-    .flash-wrapper{max-width:1100px;margin:10px auto 0;padding:0 16px}
-    .flash{background:#fff;padding:10px 14px;margin-bottom:8px;border-radius:12px;box-shadow:0 2px 6px rgba(0,0,0,.06);font-size:.85rem;border-left:6px solid #64b5f6}
-    .flash-success{border-left-color:#81c784}
-    .flash-danger{border-left-color:#e57373}
-    .flash-warning{border-left-color:#ffb74d}
-    .flash-info{border-left-color:#64b5f6}
-    input,textarea{width:100%;padding:10px 12px;border:1px solid #e0c7d4;border-radius:10px}
-    button{background:#7e57c2;color:#fff;border:none;padding:10px 14px;border-radius:12px;cursor:pointer}
-    .danger{background:#e57373}
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Noto Sans TC','微軟正黑體',sans-serif;
+      background: #f4f6f9;
+      margin: 0;
+      color: #1f2933;
+    }
+    a { color: inherit; text-decoration: none; }
+    .page-header {
+      background: linear-gradient(135deg,#4f8cff,#38c6ff);
+      color: #fff;
+      padding: 18px 20px 14px;
+      box-shadow: 0 2px 10px rgba(15,23,42,0.25);
+    }
+    .page-header-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .page-title {
+      font-size: 1.7rem;
+      font-weight: 700;
+      letter-spacing: .08em;
+    }
+    .page-subtitle {
+      font-size: .9rem;
+      opacity: .9;
+    }
+    .nav-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 6px;
+    }
+    .nav-link-btn {
+      padding: 6px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.25);
+      background: rgba(15,23,42,0.08);
+      color: #fff;
+      font-size: .86rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .15s, box-shadow .15s, transform .15s;
+    }
+    .nav-link-btn.primary {
+      background: #fff;
+      color: #2563eb;
+    }
+    .nav-link-btn:hover {
+      background: rgba(255,255,255,0.22);
+      box-shadow: 0 2px 6px rgba(15,23,42,0.28);
+      transform: translateY(-1px);
+    }
+
+    .wrapper {
+      max-width: 1200px;
+      margin: 22px auto 40px;
+      padding: 0 16px;
+    }
+    .flash-wrapper {
+      margin-bottom: 12px;
+    }
+    .flash {
+      background: #fff;
+      padding: 10px 14px;
+      margin-bottom: 8px;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(15,23,42,0.06);
+      font-size: .9rem;
+      border-left: 4px solid #60a5fa;
+    }
+    .flash-success { border-left-color:#22c55e; }
+    .flash-danger  { border-left-color:#ef4444; }
+    .flash-warning { border-left-color:#f59e0b; }
+    .flash-info    { border-left-color:#60a5fa; }
+
+    .card {
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: 0 2px 10px rgba(15,23,42,0.06);
+      padding: 16px 16px 18px;
+      margin-bottom: 16px;
+    }
+    .card-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #2563eb;
+    }
+    .card-note {
+      font-size: .8rem;
+      color: #6b7280;
+    }
+
+    .search-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+    .search-input {
+      flex: 1 1 220px;
+      padding: 9px 12px;
+      border-radius: 999px;
+      border: 1px solid #d1d5db;
+      font-size: .9rem;
+    }
+    .btn-pill {
+      padding: 8px 16px;
+      border-radius: 999px;
+      border: none;
+      font-size: .9rem;
+      font-weight: 600;
+      cursor: pointer;
+      background: linear-gradient(135deg,#4f8cff,#38c6ff);
+      color: #fff;
+      box-shadow: 0 1px 4px rgba(15,23,42,0.18);
+      transition: transform .15s, box-shadow .15s, opacity .15s;
+    }
+    .btn-pill:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 3px 10px rgba(15,23,42,0.24);
+    }
+    .btn-pill.secondary {
+      background: #e5e7eb;
+      color: #111827;
+      box-shadow: none;
+    }
+    .btn-pill.danger {
+      background: linear-gradient(135deg,#ef4444,#f97316);
+    }
+
+    .grid-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.1fr);
+      gap: 16px;
+    }
+    @media (max-width: 900px) {
+      .grid-row { grid-template-columns: minmax(0,1fr); }
+    }
+
+    .field-label {
+      font-size: .8rem;
+      color: #6b7280;
+      margin-bottom: 3px;
+    }
+    .field-value {
+      font-size: .9rem;
+      margin-bottom: 4px;
+    }
+
+    input[type="text"],
+    input[type="number"],
+    textarea,
+    select {
+      width: 100%;
+      padding: 8px 10px;
+      border-radius: 9px;
+      border: 1px solid #d1d5db;
+      font-size: .88rem;
+    }
+    textarea { resize: vertical; }
+
+    .form-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .form-row > div { flex: 1 1 120px; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .85rem;
+    }
+    thead { background: #eff6ff; }
+    th, td {
+      padding: 6px 8px;
+      border-bottom: 1px solid #e5e7eb;
+      white-space: nowrap;
+      text-align: left;
+    }
+    tbody tr:nth-child(even) { background: #fafafa; }
+    tbody tr:hover { background: #f1f5f9; }
+    .table-wrapper {
+      max-height: 420px;
+      overflow: auto;
+      border-radius: 10px;
+      box-shadow: 0 1px 4px rgba(15,23,42,0.06);
+    }
+
+    .badge-balance {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 999px;
+      background: #ecfdf5;
+      color: #047857;
+      font-size: .8rem;
+      font-weight: 600;
+    }
+    .coupon-inline {
+      font-size: .82rem;
+      color: #4b5563;
+      margin-top: 3px;
+    }
+    .hint-text {
+      font-size: .78rem;
+      color: #9ca3af;
+      margin-top: 4px;
+    }
   </style>
   <script>
     function confirmConsume(){
@@ -33,146 +234,247 @@
   </script>
 </head>
 <body>
-  <div class="header">
-    <h2>💳 儲值金專區</h2>
-  <a href="/admin/home">回後台主頁</a>
-  <a href="/admin/wallet/reconcile">儲值對帳</a>
-  <a href="/admin/wallet/reconcile/consume">扣款對帳</a>
-  <a href="/admin/wallet/summary">儲值記錄</a>
-  </div>
-  {% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
+  <header class="page-header">
+    <div class="page-header-inner">
+      <div>
+        <div class="page-title">儲值金專區</div>
+        <div class="page-subtitle">查詢錢包、快速儲值 / 扣款與交易檢視</div>
+      </div>
+      <nav class="nav-links">
+        <a href="/admin/home" class="nav-link-btn primary">回後台主頁</a>
+        <a href="/admin/wallet/reconcile" class="nav-link-btn">儲值對帳</a>
+        <a href="/admin/wallet/reconcile/consume" class="nav-link-btn">扣款對帳</a>
+        <a href="/admin/wallet/summary" class="nav-link-btn">錢包摘要</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrapper">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
       <div class="flash-wrapper">
         {% for category, msg in messages %}
-        <div class="flash flash-{{ category }}">{{ msg }}</div>
+          <div class="flash flash-{{ category }}">{{ msg }}</div>
         {% endfor %}
       </div>
-    {% endif %}
-  {% endwith %}
+      {% endif %}
+    {% endwith %}
 
-  <div class="container">
-    <div class="card">
-      <form method="get" action="/admin/wallet" style="display:flex;gap:10px;align-items:center">
-        <input name="q" value="{{ q or '' }}" placeholder="輸入手機或用戶編號查詢" />
-        <button type="submit">查詢</button>
+    <section class="card">
+      <div class="card-header">
+        <div class="card-title">查詢錢包</div>
+        <div class="card-note">輸入手機或白名單編號，可自動建立新錢包</div>
+      </div>
+      <form method="get" action="/admin/wallet" class="search-row">
+        <input name="q" class="search-input" value="{{ q or '' }}" placeholder="輸入手機 09xxxxxxxx 或白名單編號" />
+        <button type="submit" class="btn-pill">查詢</button>
       </form>
       {% if error %}
-      <div style="margin-top:10px;color:#d32f2f;font-size:.85rem;">{{ error }}</div>
+      <div style="margin-top:8px;color:#b91c1c;font-size:.82rem;">{{ error }}</div>
       {% endif %}
       {% if not wallet and q %}
-      <div style="margin-top:10px;color:#666;font-size:.85rem;">未找到資料，可確認是否輸入正確或該手機尚未建立錢包（可直接儲值自動建立）。</div>
+      <div style="margin-top:8px;color:#4b5563;font-size:.82rem;">未找到資料，可確認是否輸入正確；若為新用戶，可直接儲值時自動建立錢包。</div>
       {% elif not wallet and not q %}
-      <div style="margin-top:10px;color:#666;font-size:.85rem;">請先輸入手機或白名單編號查詢。</div>
+      <div style="margin-top:8px;color:#4b5563;font-size:.82rem;">請先輸入手機或白名單編號進行查詢。</div>
       {% endif %}
-    </div>
+    </section>
 
     {% if wallet %}
-      <div style="margin-bottom:18px;display:flex;gap:8px;flex-wrap:wrap">
-      </div>
-    <div class="row">
-      <div class="col">
+    <section class="grid-row" style="margin-top:4px;">
+      <div>
         <div class="card">
-          <h3>用戶資訊</h3>
-          <div>手機：{{ wallet.phone or '未綁定' }}</div>
-          <div>白名單編號：{{ wallet.whitelist_id or '未綁定' }}</div>
-          <div>用戶暱稱：{{ (wl_user.name if wl_user and wl_user.name else '—') }}</div>
-          <div>LINE ID：{{ (wl_user.line_id if wl_user and wl_user.line_id else '未登記') }}</div>
-          <div>目前餘額：<b>{{ wallet.balance }}</b></div>
-          <div>折價券剩餘：500券 x {{ coupon_500_total or 0 }}、300券 x {{ coupon_300_total or 0 }}、100券 x {{ coupon_100_total or 0 }}</div>
-          <div>上次到期提醒：{{ wallet.last_coupon_notice_at.strftime('%Y/%m/%d %H:%M:%S') if wallet.last_coupon_notice_at else '尚未提醒' }}</div>
+          <div class="card-header">
+            <div class="card-title">用戶資訊</div>
+          </div>
+          <div class="field-value">手機：{{ wallet.phone or '未綁定' }}</div>
+          <div class="field-value">白名單編號：{{ wallet.whitelist_id or '未綁定' }}</div>
+          <div class="field-value">用戶暱稱：{{ (wl_user.name if wl_user and wl_user.name else '—') }}</div>
+          <div class="field-value">LINE ID：{{ (wl_user.line_id if wl_user and wl_user.line_id else '未登記') }}</div>
+          <div class="field-value" style="margin-top:4px;">
+            目前餘額：<span class="badge-balance">$ {{ wallet.balance }}</span>
+          </div>
+          <div class="coupon-inline">折價券：500券 × {{ coupon_500_total or 0 }}／300券 × {{ coupon_300_total or 0 }}／100券 × {{ coupon_100_total or 0 }}</div>
+          <div class="hint-text">上次到期提醒：{{ wallet.last_coupon_notice_at.strftime('%Y/%m/%d %H:%M:%S') if wallet.last_coupon_notice_at else '尚未提醒' }}</div>
         </div>
+
         <div class="card">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
-            <h3 style="margin:0">儲值</h3>
-            <div style="display:flex;gap:8px">
-              <button type="button" onclick="applyPreset(10000)">10000 元方案</button>
-              <button type="button" onclick="applyPreset(5000)">5000 元方案</button>
-            </div>
+          <div class="card-header">
+            <div class="card-title">儲值</div>
+            <div class="card-note">常用方案一鍵帶入券數</div>
+          </div>
+          <div class="form-row" style="margin-bottom:6px;">
+            <button type="button" class="btn-pill secondary" onclick="applyPreset(10000)">10000 元方案</button>
+            <button type="button" class="btn-pill secondary" onclick="applyPreset(5000)">5000 元方案</button>
           </div>
           <form id="topup-form" method="post" action="/admin/wallet/topup">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="phone" value="{{ wallet.phone }}">
-            <label>金額</label>
-            <input name="amount" type="number" min="0" required />
-            <label>備註</label>
-            <textarea name="remark" rows="2" placeholder="備註（例如：現金、轉帳後五碼...）"></textarea>
-            <div style="display:flex;gap:10px;margin-top:8px;align-items:flex-end">
+            <div class="form-row">
               <div>
-                <label>500券</label>
-                <input name="coupon_500_count" type="number" min="0" value="0" style="max-width:90px" />
+                <div class="field-label">金額</div>
+                <input name="amount" type="number" min="0" required />
               </div>
               <div>
-                <label>300券</label>
-                <input name="coupon_300_count" type="number" min="0" value="0" style="max-width:90px" />
-              </div>
-              <div>
-                <label>100券</label>
-                <input name="coupon_100_count" type="number" min="0" value="0" style="max-width:90px" />
+                <div class="field-label">付款方式</div>
+                <select name="payment_method">
+                  <option value="">未選</option>
+                  <option value="CASH">現金</option>
+                  <option value="BANK">匯款</option>
+                  <option value="CARD">刷卡</option>
+                  <option value="TWQR">台灣Pay/掃碼</option>
+                  <option value="OTHER">其他</option>
+                </select>
               </div>
             </div>
-            <div style="margin-top:10px"><button type="submit">儲值</button></div>
+            <div class="form-row">
+              <div>
+                <div class="field-label">單號/後五碼</div>
+                <input type="text" name="reference_id" placeholder="交易序號或後五碼" />
+              </div>
+              <div>
+                <div class="field-label">經手人</div>
+                <input type="text" name="operator" placeholder="經手人" />
+              </div>
+            </div>
+            <div class="field-label">備註</div>
+            <textarea name="remark" rows="2" placeholder="備註（例如：現金、轉帳後五碼...）"></textarea>
+            <div class="form-row" style="margin-top:6px;align-items:flex-end;">
+              <div>
+                <div class="field-label">500券</div>
+                <input name="coupon_500_count" type="number" min="0" value="0" />
+              </div>
+              <div>
+                <div class="field-label">300券</div>
+                <input name="coupon_300_count" type="number" min="0" value="0" />
+              </div>
+              <div>
+                <div class="field-label">100券</div>
+                <input name="coupon_100_count" type="number" min="0" value="0" />
+              </div>
+            </div>
+            <div style="margin-top:10px;text-align:right;">
+              <button type="submit" class="btn-pill">儲值</button>
+            </div>
           </form>
         </div>
       </div>
-      <div class="col">
+
+      <div>
         <div class="card">
-          <h3>扣款</h3>
+          <div class="card-header">
+            <div class="card-title">扣款</div>
+            <div class="card-note">支出與折價券使用</div>
+          </div>
           <form method="post" action="/admin/wallet/consume" onsubmit="return confirmConsume()">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="phone" value="{{ wallet.phone }}">
-            <label>金額</label>
-            <input name="amount" type="number" min="0" required />
-            <label>備註</label>
-            <textarea name="remark" rows="2" placeholder="備註（例如：預約紀錄）"></textarea>
-            <div style="display:flex;gap:10px;margin-top:8px">
+            <div class="form-row">
               <div>
-                <label>500券</label>
-                <input name="coupon_500_count" type="number" min="0" value="0" style="max-width:90px" />
-              </div>
-              <div>
-                <label>300券</label>
-                <input name="coupon_300_count" type="number" min="0" value="0" style="max-width:90px" />
-              </div>
-              <div>
-                <label>100券</label>
-                <input name="coupon_100_count" type="number" min="0" value="0" style="max-width:90px" />
+                <div class="field-label">金額</div>
+                <input name="amount" type="number" min="0" required />
               </div>
             </div>
-            <div style="margin-top:10px"><button type="submit" class="danger">扣款</button></div>
+            <div class="field-label">備註</div>
+            <textarea name="remark" rows="2" placeholder="備註（例如：預約紀錄）"></textarea>
+            <div class="form-row" style="margin-top:6px;">
+              <div>
+                <div class="field-label">500券</div>
+                <input name="coupon_500_count" type="number" min="0" value="0" />
+              </div>
+              <div>
+                <div class="field-label">300券</div>
+                <input name="coupon_300_count" type="number" min="0" value="0" />
+              </div>
+              <div>
+                <div class="field-label">100券</div>
+                <input name="coupon_100_count" type="number" min="0" value="0" />
+              </div>
+            </div>
+            <div style="margin-top:10px;text-align:right;">
+              <button type="submit" class="btn-pill danger">扣款</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">手動沖正 / 調整</div>
+          </div>
+          <form method="post" action="/admin/wallet/adjust" onsubmit="return confirm('確認執行手動調整？')">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="phone" value="{{ wallet.phone }}">
+            <div class="form-row">
+              <div>
+                <div class="field-label">金額（可正可負）</div>
+                <input name="amount" type="number" step="1" required />
+              </div>
+              <div>
+                <div class="field-label">經手人</div>
+                <input type="text" name="operator" placeholder="經手人" />
+              </div>
+            </div>
+            <div class="field-label">備註</div>
+            <textarea name="remark" rows="2" placeholder="請填寫調整原因"></textarea>
+            <div style="margin-top:10px;text-align:right;">
+              <button type="submit" class="btn-pill">執行調整</button>
+            </div>
           </form>
         </div>
       </div>
-    </div>
+    </section>
 
-    <div class="card">
-      <h3>最近交易</h3>
-      <table>
-        <thead><tr><th>時間</th><th>類型</th><th>金額</th><th>備註</th><th>500券</th><th>300券</th><th>100券</th><th>操作</th></tr></thead>
-        <tbody>
-          {% for t in txns %}
-          <tr>
-            <td>{{ t.local_time_str }}</td>
-            <td>{{ t.type }}</td>
-            <td>{{ t.amount }}</td>
-            <td>{{ t.adjusted_remark or t.remark }}</td>
-            <td>{{ t.coupon_500_count }}</td>
-            <td>{{ t.coupon_300_count }}</td>
-            <td>{{ t.coupon_100_count if t.coupon_100_count is not none else 0 }}</td>
-            <td>
-              <form method="post" action="/admin/wallet/txn/delete" onsubmit="return confirm('確認刪除此交易？')" style="display:inline-block">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <input type="hidden" name="id" value="{{ t.id }}">
-                <input type="hidden" name="q" value="{{ wallet.phone }}">
-                <button type="submit" class="danger" style="padding:6px 10px">刪除</button>
-              </form>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
+    <section class="card" style="margin-top:4px;">
+      <div class="card-header">
+        <div class="card-title">最近交易</div>
+        <div class="card-note">顯示近 100 筆交易，可直接刪除錯誤紀錄</div>
+      </div>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>時間</th>
+              <th>類型</th>
+              <th>金額</th>
+              <th>付款方式</th>
+              <th>單號</th>
+              <th>經手人</th>
+              <th>備註</th>
+              <th>500券</th>
+              <th>300券</th>
+              <th>100券</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for t in txns %}
+            <tr>
+              <td>{{ t.local_time_str }}</td>
+              <td>{{ t.type }}</td>
+              <td>{{ t.amount }}</td>
+              <td>{{ t.payment_method or '—' }}</td>
+              <td>{{ t.reference_id or '—' }}</td>
+              <td>{{ t.operator or '—' }}</td>
+              <td>{{ t.adjusted_remark or t.remark }}</td>
+              <td>{{ t.coupon_500_count }}</td>
+              <td>{{ t.coupon_300_count }}</td>
+              <td>{{ t.coupon_100_count if t.coupon_100_count is not none else 0 }}</td>
+              <td>
+                <form method="post" action="/admin/wallet/txn/delete" onsubmit="return confirm('確認刪除此交易？')" style="display:inline-block">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <input type="hidden" name="id" value="{{ t.id }}">
+                  <input type="hidden" name="q" value="{{ wallet.phone }}">
+                  <button type="submit" class="btn-pill danger" style="padding:4px 8px;font-size:.8rem;">刪除</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
     {% endif %}
-  </div>
+  </main>
+
   <script>
     // 依照日期區間自動帶入 10000/5000 預設方案（只作用於上方儲值表單）
     function applyPreset(total){

@@ -1,0 +1,50 @@
+<!doctype html>
+<html>
+<head>
+  <title>公司管理</title>
+</head>
+<body>
+  <h1>公司管理儀表板</h1>
+  <p><a href="{{ url_for('external.features') }}">返回功能頁</a></p>
+
+  {% if me and me.company_id %}
+  <h2>公司成員</h2>
+  <table>
+    <thead><tr><th>Email</th><th>角色</th><th>會員到期</th><th>操作</th></tr></thead>
+    <tbody>
+      {% for m in members %}
+      <tr>
+        <td>{{ m.email }}</td>
+        <td>{{ m.role or 'user' }}</td>
+        <td>{{ m.expires_at or '—' }}</td>
+        <td>
+          <form method="post" action="{{ url_for('external.company_user_role') }}" style="display:inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+            <input type="hidden" name="user_id" value="{{ m.id }}" />
+            <select name="role">
+              <option value="user">user</option>
+              <option value="operator">operator</option>
+              <option value="paid_admin">paid_admin</option>
+            </select>
+            <button type="submit">設角色</button>
+          </form>
+          <form method="post" action="{{ url_for('external.company_user_membership') }}" style="display:inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+            <input type="hidden" name="user_id" value="{{ m.id }}" />
+            <select name="action">
+              <option value="add">加天數</option>
+              <option value="deduct">減天數</option>
+            </select>
+            <input type="number" name="days" min="1" placeholder="天數" />
+            <button type="submit">更新會員</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+    <p>尚未指派公司，請聯絡超管。</p>
+  {% endif %}
+</body>
+</html>

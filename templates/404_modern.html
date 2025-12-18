@@ -1,0 +1,15 @@
+{% extends 'base_modern.html' %}
+{% block title %}頁面不存在{% endblock %}
+{% block content %}
+  <div style="max-width:720px;margin:40px auto">
+    <div style="background:#fff;border:1px solid #e0e6ef;border-radius:12px;padding:24px;box-shadow:0 4px 16px rgba(0,0,0,.04)">
+      <h2 style="margin:0 0 8px">頁面不存在 (404)</h2>
+      <p>您所請求的網址不存在或已移動。</p>
+      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+        <a href="/" style="padding:8px 12px;border:1px solid #e0e6ef;border-radius:8px;background:#fff;color:#2c3e50;text-decoration:none">回到主頁</a>
+        <a href="/login" style="padding:8px 12px;border:1px solid #e0e6ef;border-radius:8px;background:#fff;color:#2c3e50;text-decoration:none">登入</a>
+        <a href="/admin/home" style="padding:8px 12px;border:1px solid #e0e6ef;border-radius:8px;background:#fff;color:#2c3e50;text-decoration:none">管理首頁</a>
+      </div>
+    </div>
+  </div>
+{% endblock %}

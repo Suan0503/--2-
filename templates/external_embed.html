@@ -1,0 +1,38 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>嵌入管理</title>
+  <style>
+    body{margin:0;font-family:sans-serif}
+    header{padding:10px;background:#1976d2;color:#fff}
+    .controls{padding:10px;background:#f5f5f5;border-bottom:1px solid #ddd}
+    iframe{width:100%;height:calc(100vh - 100px);border:0}
+    select,button{padding:6px 10px;margin-right:8px}
+  </style>
+</head>
+<body>
+  <header>
+    <strong>外部嵌入管理頁</strong>
+    <span style="float:right"><a href="{{ url_for('external.features') }}" style="color:#fff">返回</a></span>
+  </header>
+  <div class="controls">
+    <form method="get" action="{{ url_for('external.admin_embed') }}" style="display:inline">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+      <label>選擇頁面：</label>
+      <select name="path">
+        <option value="home" {% if path=='home' %}selected{% endif %}>管理首頁</option>
+        <option value="dashboard" {% if path=='dashboard' %}selected{% endif %}>Dashboard</option>
+        <option value="schedule" {% if path=='schedule' %}selected{% endif %}>排程</option>
+        <option value="wallet" {% if path=='wallet' %}selected{% endif %}>錢包</option>
+        <option value="wallet_summary" {% if path=='wallet_summary' %}selected{% endif %}>錢包總表</option>
+        <option value="wallet_reconcile" {% if path=='wallet_reconcile' %}selected{% endif %}>儲值對帳</option>
+        <option value="wallet_reconcile_consume" {% if path=='wallet_reconcile_consume' %}selected{% endif %}>扣款對帳</option>
+        <option value="wallet_reconcile_adjusted" {% if path=='wallet_reconcile_adjusted' %}selected{% endif %}>隱密沖帳總報表</option>
+      </select>
+      <button type="submit">載入</button>
+    </form>
+  </div>
+  <iframe src="{{ embed_url }}" referrerpolicy="no-referrer" sandbox="allow-forms allow-scripts allow-same-origin"></iframe>
+</body>
+</html>
