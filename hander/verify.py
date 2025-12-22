@@ -893,9 +893,11 @@ def handle_post_ocr_confirm(event):
         return True
 
     if user_text == "1":
-        # 一般用戶 OCR 比對失敗後，step 為 waiting_confirm_after_ocr
+        # 用戶回覆「1」確認資料：
+        #  - 一般用戶 OCR 比對失敗後，step 為 waiting_confirm_after_ocr
+        #  - 圖片驗證／管理員手動通關後，step 為 waiting_confirm
         tu = get_temp_user(user_id)
-        if tu and tu.get("step") == "waiting_confirm_after_ocr":
+        if tu and tu.get("step") in ("waiting_confirm_after_ocr", "waiting_confirm"):
             tz = pytz.timezone("Asia/Taipei")
             data = tu
             now = datetime.now(tz)
