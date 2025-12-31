@@ -72,6 +72,7 @@
                   <input type="radio" name="selected_name" value="{{ g.name }}" {% if selected_name==g.name %}checked{% endif %} />
                   {{ g.name }}
                   <span class="hint" style="margin-left:4px">(40:{{ g.s40 or '-' }} / 60:{{ g.s60 or '-' }} / 90:{{ g.s90 or '-' }})</span>
+                  <button type="submit" name="action" value="delete_config:{{ g.name }}" style="margin-left:6px;border:none;background:#ef5350;color:#fff;font-size:.7rem;border-radius:999px;padding:2px 8px;cursor:pointer">刪除</button>
                 </label>
               {% else %}
                 <div class="hint">尚未新增任何妹妹，請先在左側輸入一位妹妹的薪資再按「新增」。</div>

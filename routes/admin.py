@@ -1374,6 +1374,21 @@ def wage_reconcile():
         include_meal = bool(request.form.get('include_meal'))
         selected_name = (request.form.get('selected_name') or '').strip()
 
+        # 刪除已設定的妹妹薪資
+        if action.startswith('delete_config:'):
+            target_name = action.split(':', 1)[1].strip()
+            if target_name:
+                try:
+                    cfg = WageConfig.query.filter_by(name=target_name).first()
+                    if cfg:
+                        db.session.delete(cfg)
+                        db.session.commit()
+                        if selected_name == target_name:
+                            selected_name = ''
+                except Exception as e:
+                    db.session.rollback()
+                    errors.append(f"刪除妹妹薪資設定時發生錯誤：{e}")
+
         # 新增或更新妹妹薪資設定：姓名 + 90/60/40 分金額
         if action == 'add_config':
             new_name = (request.form.get('new_name') or '').strip()
