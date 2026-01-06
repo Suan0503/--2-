@@ -27,9 +27,8 @@ WINTER_PURPLE = "#6A1B9A"  # 夜色紫
 # ====== 共用：隨機客服/預約群連結 ======
 def choose_link():
     group = [
-        "https://line.me/ti/p/g7TPO_lhAL",
-        "https://line.me/ti/p/emkjaMQkMK",
-        "https://line.me/ti/p/AKRUvSCLRC",
+        "https://line.me/ti/p/g7TPO_lhAL",  # 一館
+        "https://line.me/ti/p/AKRUvSCLRC",  # 二館
     ]
     return secrets_choice(group)
 
