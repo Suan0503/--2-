@@ -28,7 +28,8 @@ WINTER_PURPLE = "#6A1B9A"  # 夜色紫
 def choose_link():
     group = [
         "https://line.me/ti/p/g7TPO_lhAL",  # 一館
-        "https://line.me/ti/p/AKRUvSCLRC",  # 二館
+        "https://line.me/ti/p/Q6-jrvhXbH",  # 二館
+        "https://line.me/ti/p/AKRUvSCLRC",  # 三館
     ]
     return secrets_choice(group)
 
