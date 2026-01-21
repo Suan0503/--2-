@@ -19,7 +19,7 @@ from flask_migrate import Migrate
 from routes.message import message_bp
 from routes.pending_verify import pending_bp
 from routes.admin import admin_bp
-from routes.external import external_bp
+# from routes.external import external_bp  # 已停用舊的 MN System，現使用 mingteaai.up.railway.app/admin/home
 from models import Whitelist, Blacklist, TempVerify, Coupon
 import secrets
 
@@ -113,7 +113,7 @@ app.register_blueprint(message_bp)
 csrf.exempt(message_bp)  # 豁免 LINE Webhook /callback 不使用 CSRF Token
 app.register_blueprint(pending_bp)
 app.register_blueprint(admin_bp)
-app.register_blueprint(external_bp)
+# app.register_blueprint(external_bp)  # 已停用舊的 MN System (web-production-9351)
 
 """admin 相關路由已移至 routes/admin.py 的 Blueprint"""
 
