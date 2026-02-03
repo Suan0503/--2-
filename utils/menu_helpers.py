@@ -30,6 +30,8 @@ def choose_link():
         "https://line.me/ti/p/g7TPO_lhAL",  # 一館
         "https://line.me/ti/p/Q6-jrvhXbH",  # 二館
         "https://line.me/ti/p/AKRUvSCLRC",  # 三館
+        "https://line.me/ti/p/nFXYn3SANQ",  # 四館
+        "https://line.me/ti/p/udNsUvCQtG",  # 五館
     ]
     return secrets_choice(group)
 
