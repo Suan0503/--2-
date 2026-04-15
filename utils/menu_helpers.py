@@ -29,9 +29,7 @@ def choose_link():
     group = [
         "https://line.me/ti/p/g7TPO_lhAL",  # 一館 = DD
         "https://line.me/ti/p/Q6-jrvhXbH",  # 二館 = DD
-        "https://line.me/ti/p/AKRUvSCLRC",  # 三館 = 阿浩
-        "https://line.me/ti/p/nmUm2sjhHK",  # 四館 = 阿浩
-        "https://line.me/ti/p/udNsUvCQtG",  # 五館 = 蜻蜓
+        "https://line.me/ti/p/nmUm2sjhHK",  # 四館 = 小宇
     ]
     return secrets_choice(group)
 
